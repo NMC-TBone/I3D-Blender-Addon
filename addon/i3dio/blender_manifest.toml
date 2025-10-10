@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
-id = "i3dcommunity"
+id = "i3dio"
 version = "0.0.0"
 name = "GIANTS I3D Community Exporter"
 tagline = "Exports into GIANTS I3D format for use in eg. Farming Simulator"
-maintainer = "Developer name <email@address.com>"
+maintainer = "StjerneIdioten <stjerneidioten@gmail.com>"
 type = "add-on"
 website = "https://stjerneidioten.github.io/I3D-Blender-Addon/"
 tags = ["Import-Export"]
