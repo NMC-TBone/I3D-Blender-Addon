@@ -18,6 +18,7 @@ def register():
     ui.shader_picker.register()
     ui.udim_to_mat_template.register()
     ui.exporter.register()
+    ui.dds_exporter.register()
     ui.collision_data.register()
     ui.bit_mask_editor.register()
     ui.presets.register()
@@ -31,6 +32,7 @@ def register():
 def unregister():
     bpy.types.TOPBAR_MT_file_export.remove(ui.exporter.menu_func_export)
     ui.exporter.unregister()
+    ui.dds_exporter.unregister()
     ui.user_attributes.unregister()
     ui.bit_mask_editor.unregister()
     ui.presets.unregister()
