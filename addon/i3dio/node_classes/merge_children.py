@@ -1,9 +1,10 @@
-import mathutils
 import bpy
+import mathutils
 
-from .node import SceneGraphNode
-from .shape import (ShapeNode, EvaluatedMesh)
 from ..i3d import I3D
+from ..scenegraph.shape_node import ShapeNode
+from ..shapes.evaluated import EvaluatedMesh
+from .node import SceneGraphNode
 
 # Maximum index value for `mergeChildren` objects, used to normalize
 # generic values (g_value) for shaders. This constant is critical for:

@@ -362,6 +362,7 @@ class I3D:
 # To avoid a circular import, since all nodes rely on the I3D class, but i3d itself contains all the different nodes.
 from .node_classes.node import *
 from .node_classes.shape import *
+from .scenegraph.shape_node import *
 from .shapes.evaluated import *
 from .node_classes.merge_group import *
 from .node_classes.merge_children import *
