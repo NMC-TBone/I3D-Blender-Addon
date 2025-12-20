@@ -3,14 +3,16 @@ A lot of classes in this file is purely to have different classes for different 
 but it helps with debugging big trees and seeing the structure.
 """
 from __future__ import annotations
-from collections import ChainMap
-import mathutils
-import bpy
 
-from .node import (TransformGroupNode, SceneGraphNode)
-from .shape import (ShapeNode, EvaluatedMesh, IndexedTriangleSet)
-from ..i3d import I3D
+from collections import ChainMap
+
+import bpy
+import mathutils
+
 from .. import xml_i3d
+from ..i3d import I3D
+from .node import SceneGraphNode, TransformGroupNode
+from .shape import EvaluatedMesh, IndexedTriangleSet, ShapeNode
 
 
 class SkinnedMeshBoneNode(TransformGroupNode):

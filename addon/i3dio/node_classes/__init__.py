@@ -1,36 +1,20 @@
-if "bpy" in locals():
-    import importlib
-    reloadable_modules = [
-        'file',
-        'material',
-        'node',
-        'shape',
-        'merge_group',
-        'skinned_mesh'
-    ]
+# i3dio/node_classes/__init__.py
 
-    for module_name in reloadable_modules:
-        if module_name in locals():
-            importlib.reload(locals()[module_name])
-
-# def reload_package(module_dict_main):
-#     import importlib
-#     from pathlib import Path
-#
-#     def reload_package_recursive(current_dir, module_dict):
-#         for path in current_dir.iterdir():
-#             if "__init__" in str(path) or path.stem not in module_dict:
-#                 continue
-#
-#             if path.is_file() and path.suffix == ".py":
-#                 importlib.reload(module_dict[path.stem])
-#             elif path.is_dir():
-#                 reload_package_recursive(path, module_dict[path.stem].__dict__)
-#
-#     reload_package_recursive(Path(__file__).parent, module_dict_main)
-#
-#
-# if "bpy" in locals():
-#     reload_package(locals())
+_needs_reload = "bpy" in locals()
 
 import bpy
+
+# If you keep a compat shim shape.py (recommended), import it too.
+from . import animation, file, material, merge_children, merge_group, node, shape, skinned_mesh
+
+if _needs_reload:
+    import importlib
+    file = importlib.reload(file)
+    material = importlib.reload(material)
+    node = importlib.reload(node)
+    shape = importlib.reload(shape)
+    merge_group = importlib.reload(merge_group)
+    merge_children = importlib.reload(merge_children)
+    skinned_mesh = importlib.reload(skinned_mesh)
+    animation = importlib.reload(animation)
+    print("i3dio Add-on Reloaded")
