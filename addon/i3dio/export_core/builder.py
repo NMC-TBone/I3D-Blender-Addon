@@ -1,40 +1,38 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 
-from .ids import IdAllocator, IdKind
-from .ir import ExportIR, NodeKind, SceneNode
+from .ctx import ExportContext
+from .ids import IdKind
+from .ir import NodeKind, SceneNode
 
 
 @dataclass(slots=True)
 class IRBuilder:
-    ids: IdAllocator
-    ir: ExportIR
+    ctx: ExportContext
 
     def add_transform_group(self, obj_or_collection: Any, parent_id: int | None) -> int:
-        # Dedup by object identity (like your processed_objects)
-        if obj_or_collection in self.ir.by_object:
-            return self.ir.by_object[obj_or_collection]
+        ir = self.ctx.ir
 
-        node_id = self.ids.alloc(IdKind.NODE)
-        name = obj_or_collection.name
-        mw = getattr(obj_or_collection, "matrix_world", None)
+        if obj_or_collection in ir.by_object:
+            return ir.by_object[obj_or_collection]
+
+        node_id = self.ctx.ids.alloc(IdKind.NODE)
 
         node = SceneNode(
             id=node_id,
-            name=name,
+            name=obj_or_collection.name,
             kind=NodeKind.TRANSFORM_GROUP,
             blender_ref=obj_or_collection,
             parent_id=parent_id,
-            matrix_world=mw,
+            matrix_world=getattr(obj_or_collection, "matrix_world", None),
         )
-        self.ir.nodes[node_id] = node
-        self.ir.by_object[obj_or_collection] = node_id
+
+        ir.nodes[node_id] = node
+        ir.by_object[obj_or_collection] = node_id
 
         if parent_id is None:
-            self.ir.roots.append(node_id)
+            ir.roots.append(node_id)
         else:
-            self.ir.nodes[parent_id].children.append(node_id)
+            ir.nodes[parent_id].children.append(node_id)
 
         return node_id
