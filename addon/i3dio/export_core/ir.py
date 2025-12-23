@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 
+from mathutils import Matrix
+
 
 class NodeKind(Enum):
     TRANSFORM_GROUP = auto()
@@ -19,12 +21,17 @@ class SceneNode:
     parent_id: int | None = None
     children: list[int] = field(default_factory=list)
     # store matrix in Blender space for now; convert at serialize time
-    matrix_world: Any | None = None
+    matrix_world: Matrix | None = None
+    emit_as: str | None = None  # e.g. "TransformGroup", "Camera", "Light", etc.
+
+    # generic "bag" for per-kind attributes/flags/anything
+    attrs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
 class ExportIR:
-    nodes: dict[int, SceneNode] = field(default_factory=dict)
+    scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     roots: list[int] = field(default_factory=list)
     # For fast lookup / dedup:
-    by_object: dict[Any, int] = field(default_factory=dict)  # bpy object -> node id
+    # key is a stable identity for the Blender datablock (pointer integer)
+    dedup_map: dict[int, int] = field(default_factory=dict)  # datablock_ptr -> node id

@@ -7,6 +7,7 @@ import bpy
 import mathutils
 
 from .. import debugging
+from .builder import SceneBuilder
 from .ids import IdAllocator
 from .ir import ExportIR
 from .messages import ExportMessages
@@ -18,14 +19,14 @@ class ExportContext:
     filepath: str
     depsgraph: bpy.types.Depsgraph
     conversion_matrix: mathutils.Matrix
+    conversion_matrix_inv: mathutils.Matrix = field(init=False)
     settings: dict
 
     messages: ExportMessages = field(default_factory=ExportMessages)
-
     ids: IdAllocator = field(default_factory=IdAllocator)
     ir: ExportIR = field(default_factory=ExportIR)
 
-    # freeze unit scale at export time (don’t read bpy.context repeatedly later)
+    builder: SceneBuilder = field(init=False)
     unit_scale: float = 1.0
 
     @classmethod
@@ -34,11 +35,11 @@ class ExportContext:
         *,
         filepath: str,
         depsgraph,
-        conversion_matrix,
+        conversion_matrix: mathutils.Matrix,
         unit_scale: float,
         settings: dict,
     ) -> "ExportContext":
-        return cls(
+        ctx = cls(
             name=bpy.path.display_name_from_filepath(filepath),
             filepath=filepath,
             depsgraph=depsgraph,
@@ -46,10 +47,24 @@ class ExportContext:
             settings=settings,
             unit_scale=unit_scale,
         )
+        ctx.conversion_matrix_inv = conversion_matrix.inverted_safe()
+        ctx.builder = SceneBuilder(ctx)
+        return ctx
 
-    def logger(self, name: str) -> logging.Logger:
-        """Get everything under i3dio.<name> for consistent filtering"""
+    @property
+    def log(self) -> logging.Logger:
+        return debugging.get_logger("export")
+
+    def logger(self, name: str = "export") -> logging.Logger:
         return debugging.get_logger(name)
 
     def obj_logger(self, obj_name: str, name: str = "export") -> logging.Logger:
         return debugging.ObjectNameAdapter(self.logger(name), {"object_name": obj_name})
+
+    def to_export(self, m: mathutils.Matrix) -> mathutils.Matrix:
+        """Convert a matrix from Blender space to export (i3d) space."""
+        return self.conversion_matrix @ m @ self.conversion_matrix_inv
+
+    def to_export_forward(self, m: mathutils.Matrix) -> mathutils.Matrix:
+        """Convert a direction/forward matrix from Blender space to export (i3d) space."""
+        return self.conversion_matrix @ m

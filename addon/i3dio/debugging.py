@@ -16,6 +16,7 @@ addon_console_handler.setFormatter(addon_console_formatter)
 addon_console_handler_default_level = logging.WARNING
 addon_console_handler.setLevel(addon_console_handler_default_level)
 addon_logger.addHandler(addon_console_handler)
+addon_logger.propagate = False  # Prevent double logging if root logger is used
 
 # Formatting for writing to a log file
 addon_export_log_formatter = logging.Formatter("%(name)s:%(funcName)s:%(levelname)s: %(message)s")
@@ -37,7 +38,7 @@ class ObjectNameAdapter(logging.LoggerAdapter):
 
 def get_logger(name: str) -> logging.Logger:
     # keeps everything under the addon root for consistent filtering
-    return logging.getLogger(f"{addon_name}.{name}")
+    return addon_logger.getChild(name)
 
 
 @contextmanager

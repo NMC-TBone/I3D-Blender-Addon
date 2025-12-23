@@ -1,19 +1,19 @@
-"""
-This module contains various small utility functions, that don't really belong anywhere else
-"""
+"""This module contains various small utility functions, that don't really belong anywhere else"""
+
 from __future__ import annotations
-from typing import Union, List
+
 import logging
 import math
-import mathutils
-import bpy
-from pathlib import Path
 import os
 import re
+from pathlib import Path
+
+import bpy
+import mathutils
 
 logger = logging.getLogger(__name__)
 
-BlenderObject = Union[bpy.types.Object, bpy.types.Collection]
+BlenderObject = bpy.types.Object | bpy.types.Collection
 
 
 def vector_compare(a: mathutils.Vector, b: mathutils.Vector, epsilon: float = 0.0000001) -> bool:
@@ -71,7 +71,7 @@ def as_fs_relative_path(filepath: str) -> Path:
         fs_data_path = Path(bpy.path.abspath(fs_data_pref)).resolve(strict=False)
         try:  # Return $data-prefixed path if inside FS data directory
             relative_to_fs = target_path.relative_to(fs_data_path)
-            return (Path('$data') / relative_to_fs)
+            return Path("$data") / relative_to_fs
         except ValueError:
             pass  # Not inside FS data directory
     return target_path
@@ -92,12 +92,12 @@ def as_export_path(filepath: str) -> Path:
     Returns:
         Path: The resolved path, either as a relative path (to the blend file) or an absolute path.
     """
-    if filepath.startswith('$data'):
+    if filepath.startswith("$data"):
         # Already $data-prefixed (can happen from certain shader textures)
         return Path(filepath)
 
     # Check if inside FS data directory
-    if (fs_path := as_fs_relative_path(filepath)).parts and fs_path.parts[0] == '$data':
+    if (fs_path := as_fs_relative_path(filepath)).parts and fs_path.parts[0] == "$data":
         return fs_path
 
     # Try to make path relative to the .blend file
@@ -112,7 +112,7 @@ def as_export_path(filepath: str) -> Path:
         return target_path  # Happens if on another drive
 
 
-def sort_blender_objects_by_name(objects: List[BlenderObject]) -> List[BlenderObject]:
+def sort_blender_objects_by_name(objects: list[BlenderObject]) -> list[BlenderObject]:
     return sorted(objects, key=lambda x: x.name)
 
 
@@ -124,8 +124,8 @@ with the use of a regex as detailed in this answer on stackoverflow https://stac
 """
 
 
-def sort_blender_objects_by_outliner_ordering(objects: List[BlenderObject]) -> List[BlenderObject]:
-    return sorted(objects, key=lambda s: [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', s.name)])
+def sort_blender_objects_by_outliner_ordering(objects: list[BlenderObject]) -> list[BlenderObject]:
+    return sorted(objects, key=lambda s: [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s.name)])
 
 
 def get_fs_data_path(as_path: bool = False) -> str | Path:
