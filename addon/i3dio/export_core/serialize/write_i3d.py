@@ -6,7 +6,7 @@ from ..ctx import ExportContext
 from .emit_scene import emit_scene
 
 
-def write_i3d(ctx: ExportContext, filepath: str) -> None:
+def write_i3d(ctx: ExportContext) -> None:
     root = xml_i3d.i3d_root_element(ctx.name)
 
     xml_i3d.SubElement(root, "Asset")
@@ -22,4 +22,4 @@ def write_i3d(ctx: ExportContext, filepath: str) -> None:
 
     emit_scene(ctx, scene_elem)
 
-    xml_i3d.export_to_i3d_file(root, filepath)
+    xml_i3d.export_to_i3d_file(root, ctx.filepath)

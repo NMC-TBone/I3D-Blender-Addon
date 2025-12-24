@@ -13,7 +13,9 @@ from bpy_extras.io_utils import axis_conversion
 
 from . import debugging, xml_i3d
 from .export_core.ctx import ExportContext
+from .export_core.errors import ExportUserError
 from .export_core.pipeline import run_export
+from .export_core.reporting import report_messages_to_operator
 from .utility import get_fs_data_path
 
 logger = logging.getLogger(__name__)
@@ -63,9 +65,12 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
             if operator.binarize_i3d:
                 _binarize_i3d(filepath, operator, logger)
 
+            report_messages_to_operator(operator, ctx, limit=10)
+
     # Global try/catch exception handler. So that any unspecified exception will still end up in the log file
-    except Exception:
-        logger.exception("Exception that stopped the exporter")
+    except ExportUserError as e:
+        logger.warning(f"Export aborted: {e}")
+        report_messages_to_operator(operator, ctx, limit=10)
         export_data["success"] = False
     else:
         export_data["success"] = True

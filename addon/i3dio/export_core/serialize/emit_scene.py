@@ -7,7 +7,7 @@ import mathutils
 
 from ... import xml_i3d
 from ..ctx import ExportContext
-from ..ir import NodeKind
+from ..ir import node_emit_tag
 from ..resolve.transforms import local_matrix_export
 
 
@@ -50,8 +50,7 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
     def emit_node(node_id: int, parent_elem) -> None:
         node = ctx.ir.scene_nodes[node_id]
 
-        tag = node.emit_as or "TransformGroup"
-        elem = xml_i3d.SubElement(parent_elem, tag, {"name": node.name, "nodeId": str(node.id)})
+        elem = xml_i3d.SubElement(parent_elem, node_emit_tag(node).value, {"name": node.name, "nodeId": str(node.id)})
 
         parent_node = ctx.ir.scene_nodes[node.parent_id] if node.parent_id is not None else None
         local_m = local_matrix_export(ctx, node, parent_node)

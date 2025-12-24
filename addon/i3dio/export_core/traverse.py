@@ -86,9 +86,7 @@ def add_object(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None,
 
 
 def build_from_roots(ctx: ExportContext, roots: Iterable[BlenderObject]) -> None:
-    """
-    Entry point for a set of "root items" which can be Objects and/or Collections.
-    """
+    """Entry point for a set of "root items" which can be Objects and/or Collections."""
     for item in roots:
         if isinstance(item, bpy.types.Collection):
             add_collection(ctx, item, parent_id=None)
@@ -143,5 +141,9 @@ def build_selected_only(ctx: ExportContext, selected_objs: list[bpy.types.Object
         ensure_node(obj)
 
     # Also ensure any non-root selected objects get created (if selection list isn't sorted by hierarchy)
+    r = ctx.reporter("traverse")
     for obj in sort_blender_objects_by_outliner_ordering(selected_objs):
+        if obj.name == "Empty.001":
+            # ctx.log.warning(f"just a test hehe for {obj.name}")
+            r.warn("just a test hehe for %s", obj.name, object_name=obj.name)
         ensure_node(obj)

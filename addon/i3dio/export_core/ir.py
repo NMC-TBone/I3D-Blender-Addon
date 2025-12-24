@@ -7,9 +7,34 @@ from typing import Any
 from mathutils import Matrix
 
 
+class EmitTag(str, Enum):
+    TRANSFORM_GROUP = "TransformGroup"
+    SHAPE = "Shape"
+    LIGHT = "Light"
+    CAMERA = "Camera"
+
+
 class NodeKind(Enum):
     TRANSFORM_GROUP = auto()
-    # later: SHAPE, LIGHT, CAMERA, etc.
+    BONE = auto()
+    ARMATURE = auto()
+    SHAPE = auto()
+    LIGHT = auto()
+    CAMERA = auto()
+
+
+KIND_TO_TAG: dict[NodeKind, EmitTag] = {
+    NodeKind.TRANSFORM_GROUP: EmitTag.TRANSFORM_GROUP,
+    NodeKind.BONE: EmitTag.TRANSFORM_GROUP,
+    NodeKind.ARMATURE: EmitTag.TRANSFORM_GROUP,
+    NodeKind.SHAPE: EmitTag.SHAPE,
+    NodeKind.LIGHT: EmitTag.LIGHT,
+    NodeKind.CAMERA: EmitTag.CAMERA,
+}
+
+
+def node_emit_tag(node: "SceneNode") -> EmitTag:
+    return node.emit_as or KIND_TO_TAG[node.kind]
 
 
 @dataclass(slots=True)
@@ -22,7 +47,8 @@ class SceneNode:
     children: list[int] = field(default_factory=list)
     # store matrix in Blender space for now; convert at serialize time
     matrix_world: Matrix | None = None
-    emit_as: str | None = None  # e.g. "TransformGroup", "Camera", "Light", etc.
+    emit: bool = True  # whether to emit this node (e.g. armature can be collapsed)
+    emit_as: EmitTag | None = None
 
     # generic "bag" for per-kind attributes/flags/anything
     attrs: dict[str, Any] = field(default_factory=dict)

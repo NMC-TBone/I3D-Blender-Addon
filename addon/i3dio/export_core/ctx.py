@@ -11,6 +11,7 @@ from .builder import SceneBuilder
 from .ids import IdAllocator
 from .ir import ExportIR
 from .messages import ExportMessages
+from .reporting import Reporter
 
 
 @dataclass(slots=True)
@@ -58,8 +59,19 @@ class ExportContext:
     def logger(self, name: str = "export") -> logging.Logger:
         return debugging.get_logger(name)
 
+    def reporter(self, prefix: str | None = None, *, operator=None, name: str = "export") -> Reporter:
+        base = self.logger(name)
+        if prefix:
+            base = debugging.PrefixAdapter(base, {"prefix": (prefix if prefix.endswith(": ") else prefix + ": ")})
+        return Reporter(self, base, operator=operator)
+
     def obj_logger(self, obj_name: str, name: str = "export") -> logging.Logger:
         return debugging.ObjectNameAdapter(self.logger(name), {"object_name": obj_name})
+
+    def prefixed_log(self, prefix: str, name: str = "export") -> logging.LoggerAdapter:
+        # ensure the prefix format is consistent
+        p = prefix if prefix.endswith(": ") else prefix + ": "
+        return debugging.PrefixAdapter(self.logger(name), {"prefix": p})
 
     def to_export(self, m: mathutils.Matrix) -> mathutils.Matrix:
         """Convert a matrix from Blender space to export (i3d) space."""

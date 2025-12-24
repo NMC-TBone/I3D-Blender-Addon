@@ -36,6 +36,12 @@ class ObjectNameAdapter(logging.LoggerAdapter):
         return f"[{object_name}] {msg}", kwargs
 
 
+class PrefixAdapter(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        prefix = self.extra.get("prefix", "")
+        return (f"{prefix}{msg}" if prefix else msg), kwargs
+
+
 def get_logger(name: str) -> logging.Logger:
     # keeps everything under the addon root for consistent filtering
     return addon_logger.getChild(name)

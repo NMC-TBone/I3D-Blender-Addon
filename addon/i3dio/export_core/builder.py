@@ -1,11 +1,9 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from mathutils import Matrix
-
 from ..utility import BlenderObject
 from .ids import IdKind
-from .ir import NodeKind, SceneNode
+from .ir import EmitTag, NodeKind, SceneNode
 
 if TYPE_CHECKING:
     from .ctx import ExportContext
@@ -40,11 +38,9 @@ class SceneBuilder:
         kind: NodeKind,
         blender_ref: BlenderObject,
         parent_id: int | None,
-        name: str | None = None,
-        matrix: Matrix | None = None,
         attrs: dict[str, Any] | None = None,
         dedup_key: DedupKey = AUTO_DEDUP,
-        emit_as: str | None = None,
+        emit_as: EmitTag | None = None,
     ) -> int:
         """
         Create a SceneNode in IR and attach it into the tree.
@@ -72,16 +68,14 @@ class SceneBuilder:
         node_id = ids.alloc(IdKind.NODE)
         node = SceneNode(
             id=node_id,
-            name=name or getattr(blender_ref, "name", f"Node_{node_id}"),
+            name=getattr(blender_ref, "name", f"Node_{node_id}"),
             kind=kind,
             blender_ref=blender_ref,
             parent_id=parent_id,
-            matrix_world=matrix if matrix is not None else getattr(blender_ref, "matrix_world", None),
+            matrix_world=None,
+            emit_as=emit_as,
             attrs=attrs or {},
         )
-
-        if emit_as:  # store emitter tag override in attrs for now
-            node.attrs.setdefault("emit_as", emit_as)
 
         ir.scene_nodes[node_id] = node
 
