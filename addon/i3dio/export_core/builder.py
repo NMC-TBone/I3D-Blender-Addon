@@ -9,25 +9,6 @@ if TYPE_CHECKING:
     from .ctx import ExportContext
 
 
-class _AutoDedup:
-    __slots__ = ()
-
-
-AUTO_DEDUP = _AutoDedup()
-DedupKey = int | None | _AutoDedup
-
-
-def _dedup_identity(ref: BlenderObject) -> int:
-    """
-    Dedup identity key for Blender datablocks.
-    Prefer as_pointer() because Blender can create multiple Python wrappers referring to the same underlying datablock.
-    """
-    try:
-        return ref.as_pointer()
-    except Exception:
-        return id(ref)
-
-
 @dataclass(slots=True)
 class SceneBuilder:
     ctx: "ExportContext"
@@ -39,31 +20,11 @@ class SceneBuilder:
         blender_ref: BlenderObject,
         parent_id: int | None,
         attrs: dict[str, Any] | None = None,
-        dedup_key: DedupKey = AUTO_DEDUP,
         emit_as: EmitTag | None = None,
     ) -> int:
-        """
-        Create a SceneNode in IR and attach it into the tree.
-
-        dedup_key:
-            - AUTO_DEDUP: use _dedup_identity(blender_ref)
-            - None: no deduplication
-            - int: use given key for deduplication
-        """
+        """Create a SceneNode in IR and attach it into the tree."""
         ir = self.ctx.ir
         ids = self.ctx.ids
-
-        # Resolve dedup key
-        key: int | None
-        if dedup_key is AUTO_DEDUP:
-            key = _dedup_identity(blender_ref)
-        else:
-            key = dedup_key
-
-        if key is not None:
-            existing = ir.dedup_map.get(key)
-            if existing is not None:
-                return existing
 
         node_id = ids.alloc(IdKind.NODE)
         node = SceneNode(
@@ -78,9 +39,6 @@ class SceneBuilder:
         )
 
         ir.scene_nodes[node_id] = node
-
-        if key is not None:
-            ir.dedup_map[key] = node_id
 
         if parent_id is None:
             ir.roots.append(node_id)

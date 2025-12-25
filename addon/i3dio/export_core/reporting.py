@@ -50,7 +50,7 @@ class Reporter:
             self.ctx.messages.warn(text, object_name=object_name)
 
 
-def report_messages_to_operator(operator, ctx, *, limit: int = 10) -> None:
+def report_messages_to_operator(operator, ctx: ExportContext, *, limit: int = 10) -> None:
     """Report collected messages to Blender UI (operator.report)."""
     if operator is None:
         return

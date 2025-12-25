@@ -58,6 +58,9 @@ class SceneNode:
 class ExportIR:
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     roots: list[int] = field(default_factory=list)
-    # For fast lookup / dedup:
-    # key is a stable identity for the Blender datablock (pointer integer)
-    dedup_map: dict[int, int] = field(default_factory=dict)  # datablock_ptr -> node id
+
+    # Prevent duplicate *node creation* when the same Blender Object/Collection is encountered
+    # multiple times during normal traversal (e.g. multi-collection membership).
+    # Policy: first parent wins. Disabled for instance expansion.
+    node_by_object_ptr_first_wins: dict[int, int] = field(default_factory=dict)
+    node_by_collection_ptr_first_wins: dict[int, int] = field(default_factory=dict)
