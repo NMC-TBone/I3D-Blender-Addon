@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ... import xml_i3d
 from ..ctx import ExportContext
+from .emit_files import emit_files
 from .emit_scene import emit_scene
 
 
@@ -10,7 +11,8 @@ def write_i3d(ctx: ExportContext) -> None:
     root = xml_i3d.i3d_root_element(ctx.name)
 
     xml_i3d.SubElement(root, "Asset")
-    xml_i3d.SubElement(root, "Files")
+    files_elem = xml_i3d.SubElement(root, "Files")
+    emit_files(ctx, files_elem)
     xml_i3d.SubElement(root, "Materials")
     xml_i3d.SubElement(root, "Shapes")
     xml_i3d.SubElement(root, "Dynamics")

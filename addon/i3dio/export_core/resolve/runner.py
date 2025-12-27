@@ -47,3 +47,4 @@ def resolve_all(ctx: ExportContext) -> None:
         mapped,
         {k.name: v for k, v in kinds.items()},
     )
+    ctx.files.finalize()

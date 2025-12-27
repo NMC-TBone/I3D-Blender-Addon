@@ -63,6 +63,7 @@ def resolve_properties(ctx: ExportContext, node: SceneNode) -> None:
     pg_data = getattr(data, "i3d_attributes", None) if data is not None else None
     if pg_data is not None:
         _collect_pg(owner=data, pg=pg_data, out=node.xml)
+    _resolve_reference_path(ctx, node)
 
     if node.kind == NodeKind.CAMERA and isinstance(data, bpy.types.Camera):
         _collect_camera_builtin(data, node.xml.node)
@@ -75,6 +76,25 @@ def _collect_camera_builtin(cam: bpy.types.Camera, out: dict[str, Any]) -> None:
     if cam.type == "ORTHO":
         out.setdefault("orthographic", True)
         out.setdefault("orthographicHeight", cam.ortho_scale)
+
+
+def _resolve_reference_path(ctx: ExportContext, node: SceneNode) -> None:
+    # Only TransformGroups should carry reference info
+    ref = node.blender_ref
+    if node.kind != NodeKind.TRANSFORM_GROUP or not isinstance(ref, bpy.types.Object):
+        return
+    if not (reference_path := ref.i3d_reference.path):
+        return  # no reference set
+
+    if not reference_path.lower().endswith(".i3d"):
+        ctx.node_reporter(node, "properties").warn("Reference path does not end with '.i3d': %r", reference_path)
+        return
+    node.xml.node["referenceId"] = ctx.files.add_reference(reference_path)
+    if not ref.i3d_reference.runtime_loaded:
+        node.xml.node["referenceRuntimeLoaded"] = False  # default is True, only write when False
+
+    if child_path := ref.i3d_reference.child_path.strip():
+        node.xml.node["referenceChildPath"] = child_path
 
 
 def _compile_specs(pg: Any) -> tuple[PropSpec, ...]:

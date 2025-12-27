@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import bpy
@@ -9,6 +10,7 @@ import mathutils
 
 from .. import debugging
 from .builder import SceneBuilder
+from .files import FileTable
 from .ids import IdAllocator
 from .ir import ExportIR, SceneNode
 from .messages import ExportMessages
@@ -25,11 +27,16 @@ class ExportContext:
     conversion_matrix_inv: mathutils.Matrix = field(init=False)
     settings: dict
 
+    paths: dict[str, str] = field(default_factory=dict)
+    files: FileTable = field(init=False)
+
     messages: ExportMessages = field(default_factory=ExportMessages)
     ids: IdAllocator = field(default_factory=IdAllocator)
     ir: ExportIR = field(default_factory=ExportIR)
 
     builder: SceneBuilder = field(init=False)
+    files: FileTable = field(init=False)
+    paths: dict[str, str] = field(default_factory=dict)
     unit_scale: float = 1.0
 
     @classmethod
@@ -54,6 +61,9 @@ class ExportContext:
         )
         ctx.conversion_matrix_inv = conversion_matrix.inverted_safe()
         ctx.builder = SceneBuilder(ctx)
+
+        ctx.paths["i3d_folder"] = str(Path(filepath).parent)
+        ctx.files = FileTable(ctx)
         return ctx
 
     def ctx_logger(
