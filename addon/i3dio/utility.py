@@ -15,6 +15,25 @@ logger = logging.getLogger(__name__)
 
 BlenderObject = bpy.types.Object | bpy.types.Collection
 
+_ONE3 = mathutils.Vector((1.0, 1.0, 1.0))
+
+
+def near_zero_vec(v: mathutils.Vector, eps: float = 1e-6) -> bool:
+    return v.length_squared <= eps * eps
+
+
+def near_one3(v: mathutils.Vector, eps: float = 1e-6) -> bool:
+    return near_vec(v, _ONE3, eps)
+
+
+def near_vec(a: mathutils.Vector, b: mathutils.Vector, eps: float = 1e-6) -> bool:
+    d = a - b
+    return d.length_squared <= eps * eps
+
+
+def near_zero_euler(e: mathutils.Euler, eps: float = 1e-6) -> bool:
+    return max(abs(e.x), abs(e.y), abs(e.z)) <= eps
+
 
 def vector_compare(a: mathutils.Vector, b: mathutils.Vector, epsilon: float = 0.0000001) -> bool:
     """Compares two vectors elementwise, to see if they are equal
@@ -136,3 +155,13 @@ def get_fs_data_path(as_path: bool = False) -> str | Path:
     if as_path:
         return Path(fs_data_path)
     return fs_data_path
+
+
+def strip_sorting_prefix(name: str, sep: str) -> str:
+    """Strip leading '<digits><sep>' from name (e.g. '12:Cube' -> 'Cube')."""
+    if not name or not sep:
+        return name
+    head, found, tail = name.partition(sep)  # Split at first occurrence of sep
+    if found and head.isdigit() and tail:
+        return tail
+    return name

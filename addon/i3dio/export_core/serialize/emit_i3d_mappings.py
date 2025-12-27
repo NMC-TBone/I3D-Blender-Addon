@@ -7,7 +7,6 @@ from xml.sax.saxutils import escape as xml_escape
 import bpy
 
 from ..ctx import ExportContext
-from ..reporting import Reporter
 
 
 def _iter_tree_preorder(ctx: ExportContext):
@@ -66,7 +65,7 @@ def _detect_newline(lines: list[str]) -> str:
 
 
 def _find_or_insert_block(
-    reporter: Reporter,
+    ctx: ExportContext,
     lines: list[str],
     *,
     open_tag: str,
@@ -77,6 +76,7 @@ def _find_or_insert_block(
     Return (open_idx, close_idx, base_indent). Inserts a new empty block if missing.
     base_indent is the indentation of the open tag line.
     """
+    rep = ctx.section("i3dMappings")
     open_idx = None
     close_idx = None
     base_indent = default_indent
@@ -97,7 +97,7 @@ def _find_or_insert_block(
 
     if open_idx is None:
         if last_closing_idx is None:
-            reporter.warn("Could not locate root closing tag; aborting.")
+            rep.warn("Could not locate root closing tag; aborting.")
             return None
 
         nl = _detect_newline(lines)
@@ -112,7 +112,7 @@ def _find_or_insert_block(
                 close_idx = i
                 break
         if close_idx is None:
-            reporter.warn(f"{open_tag} found but no closing tag; aborting.")
+            rep.warn("%s found but no closing tag; aborting.", open_tag)
             return None
 
     return open_idx, close_idx, base_indent
@@ -123,14 +123,14 @@ def _xml_attr(s: str) -> str:
 
 
 def emit_i3d_mappings(ctx: ExportContext) -> None:
-    reporter = ctx.reporter("i3dMappings")
+    rep = ctx.section("i3dMappings")
     file_path_raw = ctx.settings.get("i3d_mapping_file_path", "")
     if not file_path_raw:
         return
 
     file_path = Path(bpy.path.abspath(file_path_raw))
     if not file_path.exists():
-        reporter.warn(f"file not found: {str(file_path)!r}")
+        rep.warn("file not found: %r", str(file_path))
         return
 
     index_paths = _build_index_paths(ctx)
@@ -141,11 +141,11 @@ def emit_i3d_mappings(ctx: ExportContext) -> None:
         if not node.attrs.get("i3d_mapping"):
             continue
 
-        mapping_name = node.attrs.get("i3d_mapping_name") or node.name or ""
+        mapping_name = node.attrs.get("i3d_mapping_name") or node.id
         mapped.append((mapping_name, index_paths[nid]))
 
     if not mapped:
-        reporter.info("No nodes with i3d_mapping attribute; skipping.")
+        rep.debug("No nodes with i3d_mapping attribute; skipping.")
         return
 
     lines = file_path.read_text(encoding="utf-8").splitlines(keepends=True)
@@ -153,13 +153,17 @@ def emit_i3d_mappings(ctx: ExportContext) -> None:
 
     try:
         result = _find_or_insert_block(
-            reporter, lines, open_tag="<i3dMappings>", close_tag="</i3dMappings>", default_indent=" " * 4
+            ctx,
+            lines,
+            open_tag="<i3dMappings>",
+            close_tag="</i3dMappings>",
+            default_indent=" " * 4,
         )
         if result is None:
             return
         open_i, close_i, base_indent = result
     except Exception:
-        reporter.exception("Unexpected error; skipping.")
+        rep.exception("Unexpected error while writing i3dMappings; skipping.")
         return
 
     entry_indent = base_indent + (" " * 4)  # one level deeper than <i3dMappings>
@@ -170,4 +174,4 @@ def emit_i3d_mappings(ctx: ExportContext) -> None:
     # Replace contents between open/close (keep the tags)
     lines[open_i + 1 : close_i] = new_entries
     file_path.write_text("".join(lines), encoding="utf-8")
-    reporter.info(f"Wrote {len(new_entries)} entries to {str(file_path)!r}")
+    rep.debug("Wrote %d entries to %r", len(new_entries), str(file_path))

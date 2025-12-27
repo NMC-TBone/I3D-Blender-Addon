@@ -15,6 +15,7 @@ class EmitTag(str, Enum):
 
 
 class NodeKind(Enum):
+    UNRESOLVED = auto()  # placeholder kind used during traversal
     TRANSFORM_GROUP = auto()
     BONE = auto()
     ARMATURE = auto()
@@ -24,6 +25,7 @@ class NodeKind(Enum):
 
 
 KIND_TO_TAG: dict[NodeKind, EmitTag] = {
+    NodeKind.UNRESOLVED: EmitTag.TRANSFORM_GROUP,
     NodeKind.TRANSFORM_GROUP: EmitTag.TRANSFORM_GROUP,
     NodeKind.BONE: EmitTag.TRANSFORM_GROUP,
     NodeKind.ARMATURE: EmitTag.TRANSFORM_GROUP,
@@ -38,6 +40,12 @@ def node_emit_tag(node: "SceneNode") -> EmitTag:
 
 
 @dataclass(slots=True)
+class XmlBuckets:
+    node: dict[str, Any] = field(default_factory=dict)
+    children: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class SceneNode:
     id: int
     name: str
@@ -45,11 +53,14 @@ class SceneNode:
     blender_ref: Any | None
     parent_id: int | None = None
     children: list[int] = field(default_factory=list)
-    # store matrix in Blender space for now; convert at serialize time
-    matrix_world: Matrix | None = None
+    # Optional override in Blender space (used for instancing/baking/etc)
+    matrix_world_bl: Matrix | None = None
+    # Computed local transform in EXPORT space (ready for serializer)
+    matrix_local_export: Matrix | None = None
     emit: bool = True  # whether to emit this node (e.g. armature can be collapsed)
     emit_as: EmitTag | None = None
 
+    xml: XmlBuckets = field(default_factory=XmlBuckets)
     # generic "bag" for per-kind attributes/flags/anything
     attrs: dict[str, Any] = field(default_factory=dict)
 
@@ -58,9 +69,3 @@ class SceneNode:
 class ExportIR:
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     roots: list[int] = field(default_factory=list)
-
-    # Prevent duplicate *node creation* when the same Blender Object/Collection is encountered
-    # multiple times during normal traversal (e.g. multi-collection membership).
-    # Policy: first parent wins. Disabled for instance expansion.
-    node_by_object_ptr_first_wins: dict[int, int] = field(default_factory=dict)
-    node_by_collection_ptr_first_wins: dict[int, int] = field(default_factory=dict)

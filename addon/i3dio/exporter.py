@@ -40,6 +40,7 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
     time_start = time.time()
 
     # Wrap everything in a try/catch to handle addon breaking exceptions and also get them in the log file
+    ctx = None
     try:
         with log_ctx:
             logger.info(f"Blender version is: {bpy.app.version_string}")
@@ -48,6 +49,7 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
 
             depsgraph = context.evaluated_depsgraph_get()
             ctx = ExportContext.create(
+                operator=operator,
                 filepath=filepath,
                 depsgraph=depsgraph,
                 conversion_matrix=axis_conversion(to_forward=axis_forward, to_up=axis_up).to_4x4(),
@@ -60,17 +62,18 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
             for setting, value in ctx.settings.items():
                 logger.info(f"  {setting}: {value}")
 
-            run_export(ctx, operator=operator, context=context)
+            run_export(ctx, context=context)
 
             if operator.binarize_i3d:
                 _binarize_i3d(filepath, operator, logger)
 
-            report_messages_to_operator(operator, ctx, limit=10)
+            report_messages_to_operator(ctx, limit=10)
 
     # Global try/catch exception handler. So that any unspecified exception will still end up in the log file
     except ExportUserError as e:
-        logger.warning(f"Export aborted: {e}")
-        report_messages_to_operator(operator, ctx, limit=10)
+        logger.warning("Export aborted: %s", e)
+        if ctx is not None:
+            report_messages_to_operator(ctx, limit=10)
         export_data["success"] = False
     else:
         export_data["success"] = True

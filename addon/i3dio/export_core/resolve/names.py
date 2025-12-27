@@ -1,22 +1,16 @@
 # i3dio/export_core/resolve/names.py
 from __future__ import annotations
 
+from ...utility import strip_sorting_prefix
 from ..ctx import ExportContext
+from ..ir import SceneNode
 
 
-def strip_sorting_prefix(name: str, sep: str) -> str:
-    """Strip leading '<digits><sep>' from name (e.g. '12:Cube' -> 'Cube')."""
-    if not name or not sep:
-        return name
-    head, found, tail = name.partition(sep)  # Split at first occurrence of sep
-    if found and head.isdigit() and tail:
-        return tail
-    return name
-
-
-def finalize_names(ctx: ExportContext) -> None:
-    if not (sep := ctx.settings.get("object_sorting_prefix", ":")):
+def finalize_name_for_node(ctx: ExportContext, node: SceneNode) -> None:
+    if not (sep := ctx.settings.get("object_sorting_prefix", ":")) or not node.name:
         return
-    for node in ctx.ir.scene_nodes.values():
-        if name := node.name:
-            node.name = strip_sorting_prefix(name, sep)
+    before = node.name
+    after = strip_sorting_prefix(before, sep)
+    if before != after:
+        ctx.node_reporter(node, "names").debug("New name: %r -> %r (sep=%r)", before, after, sep)
+        node.name = after
