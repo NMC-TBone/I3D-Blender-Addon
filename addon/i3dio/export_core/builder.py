@@ -24,9 +24,8 @@ class SceneBuilder:
     ) -> int:
         """Create a SceneNode in IR and attach it into the tree."""
         ir = self.ctx.ir
-        ids = self.ctx.ids
 
-        node_id = ids.alloc(IdKind.NODE)
+        node_id = self.ctx.ids.alloc(IdKind.NODE)
         node = SceneNode(
             id=node_id,
             name=getattr(blender_ref, "name", f"Node_{node_id}"),

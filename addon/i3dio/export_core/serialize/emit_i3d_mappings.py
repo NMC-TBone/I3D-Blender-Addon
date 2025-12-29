@@ -97,7 +97,7 @@ def _find_or_insert_block(
 
     if open_idx is None:
         if last_closing_idx is None:
-            rep.warn("Could not locate root closing tag; aborting.")
+            rep.warning("Could not locate root closing tag; aborting.")
             return None
 
         nl = _detect_newline(lines)
@@ -112,7 +112,7 @@ def _find_or_insert_block(
                 close_idx = i
                 break
         if close_idx is None:
-            rep.warn("%s found but no closing tag; aborting.", open_tag)
+            rep.warning("%s found but no closing tag; aborting.", open_tag)
             return None
 
     return open_idx, close_idx, base_indent
@@ -130,7 +130,7 @@ def emit_i3d_mappings(ctx: ExportContext) -> None:
 
     file_path = Path(bpy.path.abspath(file_path_raw))
     if not file_path.exists():
-        rep.warn("file not found: %r", str(file_path))
+        rep.warning("file not found: %r", str(file_path))
         return
 
     index_paths = _build_index_paths(ctx)

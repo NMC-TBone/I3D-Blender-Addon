@@ -9,6 +9,9 @@ from .mappings import finalize_i3d_mapping_for_node
 from .matrices import resolve_matrices
 from .names import finalize_name_for_node
 from .properties import resolve_properties
+from .shapes.build import resolve_shapes_build
+from .shapes.link import resolve_shape_link
+from .shapes.merge_children import resolve_merge_children
 
 
 def resolve_all(ctx: ExportContext) -> None:
@@ -24,8 +27,11 @@ def resolve_all(ctx: ExportContext) -> None:
     for node in ctx.ir.scene_nodes.values():
         resolve_kind_for_node(ctx, node)
         finalize_name_for_node(ctx, node)
-        if not node.emit:
-            continue  # skip non-emitted nodes for other passes
+
+    resolve_merge_children(ctx)
+
+    for node in ctx.ir.scene_nodes.values():
+        resolve_shape_link(ctx, node)
         resolve_properties(ctx, node)
         finalize_i3d_mapping_for_node(ctx, node)
 
@@ -34,6 +40,7 @@ def resolve_all(ctx: ExportContext) -> None:
     # resolve_armatures(ctx)
     # resolve_instances(ctx)
 
+    resolve_shapes_build(ctx)
     resolve_matrices(ctx)
 
     kinds = Counter(n.kind for n in ctx.ir.scene_nodes.values())

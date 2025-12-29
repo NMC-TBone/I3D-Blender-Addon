@@ -52,8 +52,8 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
                 operator=operator,
                 filepath=filepath,
                 depsgraph=depsgraph,
+                scene=context.scene,
                 conversion_matrix=axis_conversion(to_forward=axis_forward, to_up=axis_up).to_4x4(),
-                unit_scale=context.scene.unit_settings.scale_length,
                 settings=settings,
             )
 

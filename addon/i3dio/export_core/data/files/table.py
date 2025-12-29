@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING, Literal
 
 import bpy
 
-from .. import utility
-from .ids import IdKind
+from .... import utility
+from ...ids import IdKind
 
 if TYPE_CHECKING:
-    from .ctx import ExportContext
-    from .reporting import Reporter
+    from ...ctx import ExportContext
+    from ...reporting import Reporter
 
 
 FileKind = Literal["image", "shader", "reference", "generic"]
@@ -107,7 +107,7 @@ class FileTable:
 
         rep.info("Resolved filepath: %s", e.resolved_path)
         if e.resolved_path.is_absolute():
-            rep.warn("File %r is outside the blend file folder; using absolute path in I3D.", e.blender_path)
+            rep.warning("File %r is outside the blend file folder; using absolute path in I3D.", e.blender_path)
 
     def _copy_entry(self, rep: Reporter, e: FileEntry) -> None:
         """
@@ -176,7 +176,7 @@ class FileTable:
         # Ensure we do not overwrite the source file
         source_path = Path(bpy.path.abspath(e.blender_path))
         if not source_path.exists():
-            rep.warn("File %r does not exist, cannot copy", source_path)
+            rep.warning("File %r does not exist, cannot copy", source_path)
             return
 
         # Legacy had a check comparing resolved_path to source_path, but resolved_path is relative.

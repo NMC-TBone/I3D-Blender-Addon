@@ -87,7 +87,7 @@ def _resolve_reference_path(ctx: ExportContext, node: SceneNode) -> None:
         return  # no reference set
 
     if not reference_path.lower().endswith(".i3d"):
-        ctx.node_reporter(node, "properties").warn("Reference path does not end with '.i3d': %r", reference_path)
+        ctx.node_reporter(node, "properties").warning("Reference path does not end with '.i3d': %r", reference_path)
         return
     node.xml.node["referenceId"] = ctx.files.add_reference(reference_path)
     if not ref.i3d_reference.runtime_loaded:

@@ -34,7 +34,7 @@ def _write_transform(ctx: ExportContext, elem, local_export: mathutils.Matrix | 
 
     # Scale
     if m.is_negative:
-        # optional: ctx.messages.warn(...) later
+        # optional: ctx.messages.warning(...) later
         return
 
     s = m.to_scale()

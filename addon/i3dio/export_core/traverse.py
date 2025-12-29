@@ -16,6 +16,15 @@ def _is_excluded(obj: bpy.types.Object) -> bool:
         return False
 
 
+def _is_merge_children_root(ctx: ExportContext, obj: bpy.types.Object) -> bool:
+    if obj.type != "MESH":
+        return False
+    mc = getattr(obj, "i3d_merge_children", None)
+    if not mc or not getattr(mc, "enabled", False):
+        return False
+    return "MERGE_CHILDREN" in ctx.settings.get("features_to_export", [])
+
+
 def add_object_node(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None) -> int | None:
     """Create the node for an object (no recursion). Returns node_id or None if skipped."""
     if _is_excluded(obj):
@@ -94,7 +103,13 @@ def add_object(
     collection under this object. Expansion uses force_new_nodes=True to create fresh nodes per placement.
     """
     if (node_id := add_object_node(ctx, obj, parent_id)) is None:
-        return
+        return  # excluded
+
+    if _is_merge_children_root(ctx, obj):
+        ctx.ir.index.merge_children_roots.append(node_id)
+        ctx.object_reporter(obj, "traverse").debug("MergeChildren root: skipping child traversal")
+        return  # skip child traversal, will be handled later
+
     if obj.instance_collection is not None:
         ctx.object_reporter(obj, "traverse").debug("Expanding instance_collection %r", obj.instance_collection.name)
         add_collection(ctx, obj.instance_collection, node_id, force_new_nodes=True)
@@ -137,7 +152,30 @@ def build_selected_only(ctx: ExportContext, selected_objs: list[bpy.types.Object
     # So we do a simple two-step: create node for each selected object when reached.
     created: dict[bpy.types.Object, int | None] = {}
 
+    def _nearest_selected_merge_root(obj: bpy.types.Object) -> bpy.types.Object | None:
+        """
+        Walk the selected-parent chain and return the first ancestor that is a MergeChildren root.
+        (If any selected ancestor is a merge root, the whole selected subtree under it is suppressed.)
+        """
+        cur = obj
+        while cur in parent_map:
+            p = parent_map[cur]
+            if _is_merge_children_root(ctx, p):
+                return p
+            cur = p
+        return None
+
     def ensure_node(obj: bpy.types.Object) -> int | None:
+        # If obj is under a selected merge-root ancestor, suppress this node (and rely on merge pass later).
+        merge_root = _nearest_selected_merge_root(obj)
+        if merge_root is not None:
+            mid = ensure_node(merge_root)
+            if mid is None:
+                pass
+            else:
+                created[obj] = None
+                return None
+
         if obj in created:
             return created[obj]
         pid: int | None = None
@@ -149,6 +187,10 @@ def build_selected_only(ctx: ExportContext, selected_objs: list[bpy.types.Object
                 return None
         node_id = add_object_node(ctx, obj, pid)
         created[obj] = node_id
+
+        if node_id is not None and _is_merge_children_root(ctx, obj):
+            ctx.ir.index.merge_children_roots.append(node_id)
+            ctx.object_reporter(obj, "traverse").debug("MergeChildren root (selected-only): registered %s", node_id)
         return node_id
 
     for obj in roots_sorted:

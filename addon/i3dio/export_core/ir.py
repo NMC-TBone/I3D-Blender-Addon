@@ -41,12 +41,14 @@ def node_emit_tag(node: "SceneNode") -> EmitTag:
 
 @dataclass(slots=True)
 class XmlBuckets:
-    node: dict[str, Any] = field(default_factory=dict)
-    children: dict[str, dict[str, Any]] = field(default_factory=dict)
+    node: dict[str, Any] = field(default_factory=dict)  # attributes for the node itself (e.g. <IndexedTriangleSet>)
+    children: dict[str, dict[str, Any]] = field(default_factory=dict)  # child_name -> attrs (e.g. <Vertices>)
 
 
 @dataclass(slots=True)
 class SceneNode:
+    """A node in the export scene graph IR."""
+
     id: int
     name: str
     kind: NodeKind
@@ -66,6 +68,24 @@ class SceneNode:
 
 
 @dataclass(slots=True)
+class IRIndex:
+    """
+    Traversal-produced indices/marks that make resolve passes fast and explicit.
+
+    These are NOT user-facing XML attrs; they are internal lookup tables.
+    Keep them stable + deterministic (preserve traversal/outliner order).
+    """
+
+    merge_children_roots: list[int] = field(default_factory=list)  # node ids
+    # (future)
+    # merge_group_members: dict[int, list[int]] = field(default_factory=dict) # mg_index -> [node ids]
+    # skinned_mesh_nodes: list[int] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class ExportIR:
+    """Intermediate representation of the export scene graph."""
+
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     roots: list[int] = field(default_factory=list)
+    index: IRIndex = field(default_factory=IRIndex)

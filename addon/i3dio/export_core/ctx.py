@@ -10,7 +10,9 @@ import mathutils
 
 from .. import debugging
 from .builder import SceneBuilder
-from .files import FileTable
+from .data.files.table import FileTable
+from .data.materials.table import MaterialTable
+from .data.shapes.table import ShapeTable
 from .ids import IdAllocator
 from .ir import ExportIR, SceneNode
 from .messages import ExportMessages
@@ -23,6 +25,7 @@ class ExportContext:
     operator: Any  # Blender export operator
     filepath: str
     depsgraph: bpy.types.Depsgraph
+    scene: bpy.types.Scene
     conversion_matrix: mathutils.Matrix
     conversion_matrix_inv: mathutils.Matrix = field(init=False)
     settings: dict
@@ -30,13 +33,14 @@ class ExportContext:
     paths: dict[str, str] = field(default_factory=dict)
     files: FileTable = field(init=False)
 
+    shapes: ShapeTable = field(init=False, default_factory=lambda: ShapeTable(None))
+    materials: MaterialTable = field(init=False, default_factory=lambda: MaterialTable(None))
+
     messages: ExportMessages = field(default_factory=ExportMessages)
     ids: IdAllocator = field(default_factory=IdAllocator)
     ir: ExportIR = field(default_factory=ExportIR)
 
     builder: SceneBuilder = field(init=False)
-    files: FileTable = field(init=False)
-    paths: dict[str, str] = field(default_factory=dict)
     unit_scale: float = 1.0
 
     @classmethod
@@ -46,8 +50,8 @@ class ExportContext:
         operator: Any,
         filepath: str,
         depsgraph,
+        scene: bpy.types.Scene,
         conversion_matrix: mathutils.Matrix,
-        unit_scale: float,
         settings: dict,
     ) -> "ExportContext":
         ctx = cls(
@@ -55,15 +59,18 @@ class ExportContext:
             operator=operator,
             filepath=filepath,
             depsgraph=depsgraph,
+            scene=scene,
             conversion_matrix=conversion_matrix,
             settings=settings,
-            unit_scale=unit_scale,
         )
+        ctx.unit_scale = scene.unit_settings.scale_length
         ctx.conversion_matrix_inv = conversion_matrix.inverted_safe()
         ctx.builder = SceneBuilder(ctx)
 
         ctx.paths["i3d_folder"] = str(Path(filepath).parent)
         ctx.files = FileTable(ctx)
+        ctx.shapes = ShapeTable(ctx)
+        ctx.materials = MaterialTable(ctx)
         return ctx
 
     def ctx_logger(

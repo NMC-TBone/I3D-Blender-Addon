@@ -38,7 +38,7 @@ class ExportMessages:
             self._dedupe.add(key)
         self.items.append(ExportMessage(severity, text, object_name, code))
 
-    def warn(self, text: str, *, object_name: str | None = None, **kw):
+    def warning(self, text: str, *, object_name: str | None = None, **kw):
         self.add(Severity.WARNING, text, object_name=object_name, **kw)
 
     def error(self, text: str, *, object_name: str | None = None, **kw):

@@ -35,7 +35,7 @@ class Reporter:
     def debug(self, msg: str, *args) -> None:
         self.log.debug(msg, *args, stacklevel=2)
 
-    def warn(
+    def warning(
         self,
         msg: str,
         *args,
@@ -46,7 +46,7 @@ class Reporter:
         self.log.warning(msg, *args, stacklevel=2)
         text = self._msg_text(msg, args)
         obj = object_name or self._default_object_name()
-        self.ctx.messages.warn(text, object_name=obj, code=code)
+        self.ctx.messages.warning(text, object_name=obj, code=code)
         if report and self.operator:
             self.operator.report({"WARNING"}, text)
 
@@ -79,7 +79,7 @@ class Reporter:
         if severity is Severity.ERROR:
             self.ctx.messages.error(text, object_name=obj, code=code)
         else:
-            self.ctx.messages.warn(text, object_name=obj, code=code)
+            self.ctx.messages.warning(text, object_name=obj, code=code)
 
     def fail(
         self,
