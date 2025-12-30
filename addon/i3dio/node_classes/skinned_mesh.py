@@ -2,6 +2,7 @@
 A lot of classes in this file is purely to have different classes for different objects that are functionally the same,
 but it helps with debugging big trees and seeing the structure.
 """
+
 from __future__ import annotations
 
 from collections import ChainMap
@@ -16,8 +17,14 @@ from .shape import EvaluatedMesh, IndexedTriangleSet, ShapeNode
 
 
 class SkinnedMeshBoneNode(TransformGroupNode):
-    def __init__(self, id_: int, bone_object: bpy.types.Bone, i3d: I3D,
-                 parent: SceneGraphNode | None, root_node: SkinnedMeshRootNode):
+    def __init__(
+        self,
+        id_: int,
+        bone_object: bpy.types.Bone,
+        i3d: I3D,
+        parent: SceneGraphNode | None,
+        root_node: SkinnedMeshRootNode,
+    ):
         self.i3d = i3d
         self.is_child_of = False
         self.parent = parent
@@ -26,7 +33,7 @@ class SkinnedMeshBoneNode(TransformGroupNode):
         self.deferred_target: bpy.types.Object | None = None
 
         if pose_bone := self.root_node.blender_object.pose.bones.get(bone_object.name):
-            child_of = next((c for c in pose_bone.constraints if c.type == 'CHILD_OF'), None)
+            child_of = next((c for c in pose_bone.constraints if c.type == "CHILD_OF"), None)
             if child_of and (target := child_of.target) in i3d.all_objects_to_export:
                 self.is_child_of = True
                 if target in i3d.processed_objects:
@@ -42,10 +49,9 @@ class SkinnedMeshBoneNode(TransformGroupNode):
         #   - CHILD_OF target not processed yet, OR
         #   - top-level bone of a collapsed armature (not child-of-bone, not resolved CHILD_OF)
         is_child_bone = isinstance(self.parent, SkinnedMeshBoneNode)
-        has_resolved_childof = (self.is_child_of and self.deferred_target is None)
-        self.defer_transform = (
-            (self.deferred_target is not None)
-            or (self.root_node.is_collapsed and not is_child_bone and not has_resolved_childof)
+        has_resolved_childof = self.is_child_of and self.deferred_target is None
+        self.defer_transform = (self.deferred_target is not None) or (
+            self.root_node.is_collapsed and not is_child_bone and not has_resolved_childof
         )
 
     @property
@@ -155,8 +161,10 @@ class SkinnedMeshRootNode(TransformGroupNode):
         Finalizes the parenting for the armature and its bones in the scene graph.
         This is called when the armature is processed by the main scene traversal.
         """
-        self.logger.debug(f"Finalizing hierarchy for armature '{self.name}' with final parent "
-                          f"'{final_parent.name if final_parent else 'Scene Root'}'.")
+        self.logger.debug(
+            f"Finalizing hierarchy for armature '{self.name}' with final parent "
+            f"'{final_parent.name if final_parent else 'Scene Root'}'."
+        )
 
         # Make sure the armature node sits under the final parent in the Python graph (and xml if not collapsed).
         self.reparent(final_parent)
@@ -183,18 +191,20 @@ class SkinnedMeshShapeNode(ShapeNode):
     def __init__(self, id_: int, skinned_mesh_object: bpy.types.Object, i3d: I3D, parent: SceneGraphNode | None = None):
         self.armature_nodes: list[SkinnedMeshRootNode] = [
             i3d.add_armature_from_modifier(modifier.object)
-            for modifier in skinned_mesh_object.modifiers if modifier.type == 'ARMATURE' and modifier.object
+            for modifier in skinned_mesh_object.modifiers
+            if modifier.type == "ARMATURE" and modifier.object
         ]
-        self.skinned_mesh_name = f"{xml_i3d.skinned_mesh_prefix}{skinned_mesh_object.data.name}"
+        self.skinned_mesh_name = f"{xml_i3d.SKINNED_MESH_PREFIX}{skinned_mesh_object.data.name}"
         self.bone_mapping = ChainMap(*[armature.bone_mapping for armature in self.armature_nodes])
         super().__init__(id_=id_, shape_object=skinned_mesh_object, i3d=i3d, parent=parent)
 
     def _create_shape(self):
         self.shape_id = self.i3d.add_shape(
             EvaluatedMesh(self.i3d, self.blender_object, node=self),
-            self.skinned_mesh_name, bone_mapping=self.bone_mapping
+            self.skinned_mesh_name,
+            bone_mapping=self.bone_mapping,
         )
-        self.xml_elements['IndexedTriangleSet'] = self.i3d.shapes[self.shape_id].element
+        self.xml_elements["IndexedTriangleSet"] = self.i3d.shapes[self.shape_id].element
 
     def populate_xml_element(self):
         super().populate_xml_element()
@@ -203,6 +213,6 @@ class SkinnedMeshShapeNode(ShapeNode):
         if its.final_skin_bind_node_ids:
             skin_bind_ids = " ".join(map(str, its.final_skin_bind_node_ids))
             self.logger.debug(f"Writing Skin bind IDs: {skin_bind_ids}")
-            self._write_attribute('skinBindNodeIds', skin_bind_ids)
+            self._write_attribute("skinBindNodeIds", skin_bind_ids)
         else:
             self.logger.warning(f"Mesh '{self.name}' is skinned but no matching bones were found in vertex groups.")

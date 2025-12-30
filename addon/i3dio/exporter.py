@@ -34,7 +34,7 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
 
     log_ctx = nullcontext()
     if operator.log_to_file:
-        filename = filepath[: -len(xml_i3d.file_ending)] + debugging.export_log_file_ending
+        filename = filepath[: -len(xml_i3d.FILE_EXT)] + debugging.export_log_file_ending
         log_ctx = debugging.export_log_file(filename)
 
     time_start = time.time()
@@ -43,12 +43,14 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
     ctx = None
     try:
         with log_ctx:
+            addon_version = module_bl_info(sys.modules[__package__])["version"]
             logger.info(f"Blender version is: {bpy.app.version_string}")
-            logger.info(f"I3D Exporter version is: {module_bl_info(sys.modules[__package__])['version']}")
+            logger.info(f"I3D Exporter version is: {addon_version}")
             logger.info(f"Exporting to {filepath}")
 
             depsgraph = context.evaluated_depsgraph_get()
             ctx = ExportContext.create(
+                is_dev=addon_version == (0, 0, 0),
                 operator=operator,
                 filepath=filepath,
                 depsgraph=depsgraph,
@@ -75,6 +77,13 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
         if ctx is not None:
             report_messages_to_operator(ctx, limit=10)
         export_data["success"] = False
+    except Exception as e:
+        logger.exception("Export crashed due to an unexpected error: %s", e)
+        if ctx is not None:
+            report_messages_to_operator(ctx, limit=10)
+        export_data["success"] = False
+        if ctx is not None and ctx.is_dev:
+            raise  # In dev mode, re-raise the exception for debugging
     else:
         export_data["success"] = True
     finally:

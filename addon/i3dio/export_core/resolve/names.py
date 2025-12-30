@@ -1,12 +1,16 @@
 # i3dio/export_core/resolve/names.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ...utility import strip_sorting_prefix
-from ..ctx import ExportContext
 from ..ir import SceneNode
 
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
-def finalize_name_for_node(ctx: ExportContext, node: SceneNode) -> None:
+
+def finalize_name_for_node(ctx: "ExportContext", node: SceneNode) -> None:
     if not (sep := ctx.settings.get("object_sorting_prefix", ":")) or not node.name:
         return
     before = node.name

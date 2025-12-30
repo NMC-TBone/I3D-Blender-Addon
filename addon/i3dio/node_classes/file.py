@@ -16,9 +16,9 @@ from ..i3d import I3D
 
 
 class File(Node):
-    ELEMENT_TAG: ClassVar[str] = 'File'
-    NAME_FIELD_NAME: ClassVar[str] = 'filename'
-    ID_FIELD_NAME: ClassVar[str] = 'fileId'
+    ELEMENT_TAG: ClassVar[str] = "File"
+    NAME_FIELD_NAME: ClassVar[str] = "filename"
+    ID_FIELD_NAME: ClassVar[str] = "fileId"
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -31,7 +31,7 @@ class File(Node):
         self.blender_path = filepath  # This should be supplied as the normal blender relative path
         self.resolved_path: Path | None = None
         self.file_name = bpy.path.display_name_from_filepath(self.blender_path)
-        self.file_extension = self.blender_path[self.blender_path.rfind('.'):len(self.blender_path)]
+        self.file_extension = self.blender_path[self.blender_path.rfind(".") : len(self.blender_path)]
         self._xml_element = None
         super().__init__(id_, i3d, None)
 
@@ -49,8 +49,10 @@ class File(Node):
 
     # The log gets to scrambled if files are referred by their full path, so just use the filename instead
     def _set_logging_output_name_field(self):
-        return debugging.ObjectNameAdapter(logging.getLogger(f"{__name__}.{type(self).__name__}"),
-                                           {'object_name': self.file_name + self.file_extension})
+        return debugging.ObjectNameAdapter(
+            logging.getLogger(f"{__name__}.{type(self).__name__}"),
+            {"object_name": self.file_name + self.file_extension},
+        )
 
     def _create_xml_element(self):
         # In files, the node name attribute (filename) is also the path to the file. So this needs to be resolved
@@ -67,12 +69,12 @@ class File(Node):
         """
         self.resolved_path = utility.as_export_path(self.blender_path)
 
-        if str(self.resolved_path).startswith('$data'):
+        if str(self.resolved_path).startswith("$data"):
             # Game asset, always reference with $data prefix and never copy
             self.logger.info(f"Resolved as FS $data path: {self.resolved_path}")
             return
 
-        if self.i3d.settings.get('copy_files', False):
+        if self.i3d.settings.get("copy_files", False):
             self._copy_file()
             return
 
@@ -84,17 +86,17 @@ class File(Node):
 
     def _copy_file(self):
         resolved_directory = Path()
-        write_directory = Path(self.i3d.paths['i3d_folder'])
+        write_directory = Path(self.i3d.paths["i3d_folder"])
         self.logger.info("is not an FS builtin and will be copied")
 
-        match self.i3d.settings.get('file_structure', 'MODHUB'):
-            case 'FLAT':
+        match self.i3d.settings.get("file_structure", "MODHUB"):
+            case "FLAT":
                 self.logger.debug("will be copied using the 'FLAT' hierarchy structure")
-            case 'MODHUB':
+            case "MODHUB":
                 self.logger.debug("will be copied using the 'MODHUB' hierarchy structure")
                 resolved_directory = Path(type(self).MODHUB_FOLDER)
                 write_directory /= resolved_directory
-            case 'BLENDER':
+            case "BLENDER":
                 self.logger.debug("'will be copied using the 'BLENDER' hierarchy structure")
                 # TODO: Rewrite this to make it more than three levels above the blend file but allow deeper nesting
                 #  ,since current code just counts number of slashes
@@ -125,7 +127,7 @@ class File(Node):
             return
         # We write the file if it doesn't exist or if overwrite is allowed
         write_path_full = write_directory / f"{self.file_name}{self.file_extension}"
-        overwrite_files = self.i3d.settings.get('overwrite_files', False)
+        overwrite_files = self.i3d.settings.get("overwrite_files", False)
         if overwrite_files or not write_path_full.exists():
             write_directory.mkdir(parents=True, exist_ok=True)
             try:
@@ -139,12 +141,12 @@ class File(Node):
 
 
 class Image(File):
-    MODHUB_FOLDER = 'textures'
+    MODHUB_FOLDER = "textures"
 
 
 class Shader(File):
-    MODHUB_FOLDER = 'shaders'
+    MODHUB_FOLDER = "shaders"
 
 
 class Reference(File):
-    MODHUB_FOLDER = 'assets'
+    MODHUB_FOLDER = "assets"

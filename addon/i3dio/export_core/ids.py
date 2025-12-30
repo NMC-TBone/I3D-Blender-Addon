@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from itertools import count
 
 
 class IdKind(Enum):
@@ -13,16 +15,11 @@ class IdKind(Enum):
 
 @dataclass(slots=True)
 class IdAllocator:
-    next_id: dict[IdKind, int] = field(
-        default_factory=lambda: {
-            IdKind.NODE: 1,
-            IdKind.SHAPE: 1,
-            IdKind.MATERIAL: 1,
-            IdKind.FILE: 1,
-        }
-    )
+    start: int = 1
+    counters: dict[IdKind, object] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.counters = defaultdict(lambda: count(self.start))
 
     def alloc(self, kind: IdKind) -> int:
-        v = self.next_id[kind]
-        self.next_id[kind] = v + 1
-        return v
+        return next(self.counters[kind])

@@ -23,8 +23,6 @@ class SceneBuilder:
         emit_as: EmitTag | None = None,
     ) -> int:
         """Create a SceneNode in IR and attach it into the tree."""
-        ir = self.ctx.ir
-
         node_id = self.ctx.ids.alloc(IdKind.NODE)
         node = SceneNode(
             id=node_id,
@@ -37,12 +35,5 @@ class SceneBuilder:
             emit_as=emit_as,
             attrs=attrs or {},
         )
-
-        ir.scene_nodes[node_id] = node
-
-        if parent_id is None:
-            ir.roots.append(node_id)
-        else:
-            ir.scene_nodes[parent_id].children.append(node_id)
-
+        self.ctx.ir.add_node(node)
         return node_id

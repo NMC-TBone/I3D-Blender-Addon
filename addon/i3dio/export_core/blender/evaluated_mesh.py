@@ -1,14 +1,17 @@
-# i3dio/export_core/shapes/evaluated_mesh.py
+# i3dio/export_core/blender/evaluated_mesh.py
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import bpy
 import mathutils
 
-from ...ctx import ExportContext
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 
 def evaluated_mesh_for_export(
-    ctx: ExportContext,
+    ctx: "ExportContext",
     obj: bpy.types.Object,
     *,
     reference_frame: mathutils.Matrix | None = None,
@@ -29,7 +32,7 @@ def evaluated_mesh_for_export(
 
     mesh = ev_obj.to_mesh(preserve_all_data_layers=False, depsgraph=ctx.depsgraph)
 
-    # Optional "reference frame" placement (used later for merge features)
+    # Optional "reference frame" placement (used for merge features)
     if reference_frame is not None:
         mesh.transform(reference_frame.inverted() @ ev_obj.matrix_world)
 

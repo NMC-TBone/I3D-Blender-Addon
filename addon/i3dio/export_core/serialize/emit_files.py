@@ -1,11 +1,15 @@
 # i3dio/export_core/serialize/emit_files.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ... import xml_i3d
-from ..ctx import ExportContext
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 
-def emit_files(ctx: ExportContext, files_elem) -> None:
+def emit_files(ctx: "ExportContext", files_elem) -> None:
     """
     Write <Files> entries from ctx.files.
 

@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from typing import ClassVar
 
 from .. import xml_i3d
@@ -10,7 +9,7 @@ from ..shapes.evaluated import EvaluatedNurbsCurve
 class ControlVertex:
     def __init__(self, position):
         self._position = position
-        self._str = ''
+        self._str = ""
         self._make_hash_string()
 
     def _make_hash_string(self):
@@ -23,22 +22,22 @@ class ControlVertex:
         return hash(self._str)
 
     def __eq__(self, other):
-        return f"{self!s}" == f'{other!s}'
+        return f"{self!s}" == f"{other!s}"
 
     def position_for_xml(self):
         return "{0:.6g} {1:.6g} {2:.6g}".format(*self._position)
 
 
 class NurbsCurve(Node):
-    ELEMENT_TAG: ClassVar[str] = 'NurbsCurve'
-    NAME_FIELD_NAME: ClassVar[str] = 'name'
-    ID_FIELD_NAME: ClassVar[str] = 'shapeId'
+    ELEMENT_TAG: ClassVar[str] = "NurbsCurve"
+    NAME_FIELD_NAME: ClassVar[str] = "name"
+    ID_FIELD_NAME: ClassVar[str] = "shapeId"
 
     def __init__(self, id_: int, i3d: I3D, evaluated_curve_data: EvaluatedNurbsCurve, shape_name: str | None = None):
         self.id: int = id_
         self.i3d: I3D = i3d
         self.evaluated_curve_data: EvaluatedNurbsCurve = evaluated_curve_data
-        self.control_vertex: OrderedDict[ControlVertex, int] = OrderedDict()
+        self.control_vertex: dict[ControlVertex, int] = {}
         self.spline_type = None
         self.spline_form = None
         if shape_name is None:
@@ -53,20 +52,20 @@ class NurbsCurve(Node):
 
     @property
     def element(self):
-        return self.xml_elements['node']
+        return self.xml_elements["node"]
 
     @element.setter
     def element(self, value):
-        self.xml_elements['node'] = value
+        self.xml_elements["node"] = value
 
     def process_spline(self, spline):
-        if spline.type == 'BEZIER':
+        if spline.type == "BEZIER":
             points = spline.bezier_points
             self.spline_type = "cubic"
-        elif spline.type == 'NURBS':
+        elif spline.type == "NURBS":
             points = spline.points
             self.spline_type = "cubic"
-        elif spline.type == 'POLY':
+        elif spline.type == "POLY":
             points = spline.points
             self.spline_type = "linear"
         else:
@@ -85,9 +84,9 @@ class NurbsCurve(Node):
 
     def write_control_vertices(self):
         for control_vertex in list(self.control_vertex.keys()):
-            vertex_attributes = {'c': control_vertex.position_for_xml()}
+            vertex_attributes = {"c": control_vertex.position_for_xml()}
 
-            xml_i3d.SubElement(self.element, 'cv', vertex_attributes)
+            xml_i3d.SubElement(self.element, "cv", vertex_attributes)
 
     def populate_xml_element(self):
         if len(self.evaluated_curve_data.curve_data.splines) == 0:
@@ -96,8 +95,8 @@ class NurbsCurve(Node):
 
         self.populate_from_evaluated_nurbscurve()
         if self.spline_type:
-            self._write_attribute('type', self.spline_type, 'node')
+            self._write_attribute("type", self.spline_type, "node")
         if self.spline_form:
-            self._write_attribute('form', self.spline_form, 'node')
+            self._write_attribute("form", self.spline_form, "node")
         self.logger.debug(f"Has '{len(self.control_vertex)}' control vertices")
         self.write_control_vertices()

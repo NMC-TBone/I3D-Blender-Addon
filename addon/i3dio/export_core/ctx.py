@@ -10,18 +10,19 @@ import mathutils
 
 from .. import debugging
 from .builder import SceneBuilder
-from .data.files.table import FileTable
-from .data.materials.table import MaterialTable
-from .data.shapes.table import ShapeTable
 from .ids import IdAllocator
 from .ir import ExportIR, SceneNode
 from .messages import ExportMessages
 from .reporting import Reporter
+from .tables.files import FileTable
+from .tables.materials import MaterialTable
+from .tables.shapes import ShapeTable
 
 
 @dataclass(slots=True)
 class ExportContext:
     name: str
+    is_dev: bool
     operator: Any  # Blender export operator
     filepath: str
     depsgraph: bpy.types.Depsgraph
@@ -33,8 +34,8 @@ class ExportContext:
     paths: dict[str, str] = field(default_factory=dict)
     files: FileTable = field(init=False)
 
-    shapes: ShapeTable = field(init=False, default_factory=lambda: ShapeTable(None))
-    materials: MaterialTable = field(init=False, default_factory=lambda: MaterialTable(None))
+    shapes: ShapeTable = field(init=False)
+    materials: MaterialTable = field(init=False)
 
     messages: ExportMessages = field(default_factory=ExportMessages)
     ids: IdAllocator = field(default_factory=IdAllocator)
@@ -47,6 +48,7 @@ class ExportContext:
     def create(
         cls,
         *,
+        is_dev: bool,
         operator: Any,
         filepath: str,
         depsgraph,
@@ -55,7 +57,8 @@ class ExportContext:
         settings: dict,
     ) -> "ExportContext":
         ctx = cls(
-            name=bpy.path.display_name_from_filepath(filepath),
+            name="",
+            is_dev=is_dev,
             operator=operator,
             filepath=filepath,
             depsgraph=depsgraph,
@@ -67,7 +70,9 @@ class ExportContext:
         ctx.conversion_matrix_inv = conversion_matrix.inverted_safe()
         ctx.builder = SceneBuilder(ctx)
 
-        ctx.paths["i3d_folder"] = str(Path(filepath).parent)
+        i3d_path = Path(filepath)
+        ctx.name = bpy.path.display_name_from_filepath(str(i3d_path))
+        ctx.paths["i3d_folder"] = str(i3d_path.parent)
         ctx.files = FileTable(ctx)
         ctx.shapes = ShapeTable(ctx)
         ctx.materials = MaterialTable(ctx)

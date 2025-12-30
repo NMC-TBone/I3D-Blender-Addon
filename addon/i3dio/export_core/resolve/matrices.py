@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import bpy
 import mathutils
 
-from ..ctx import ExportContext
 from ..ir import NodeKind, SceneNode
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 
 def _node_world_blender(node: SceneNode) -> mathutils.Matrix | None:
@@ -18,7 +22,7 @@ def _node_world_blender(node: SceneNode) -> mathutils.Matrix | None:
     return None
 
 
-def _node_world_export(ctx: ExportContext, node: SceneNode) -> mathutils.Matrix | None:
+def _node_world_export(ctx: "ExportContext", node: SceneNode) -> mathutils.Matrix | None:
     """World matrix in EXPORT space."""
     w_bl = _node_world_blender(node)
     if w_bl is None:
@@ -30,7 +34,7 @@ def _node_world_export(ctx: ExportContext, node: SceneNode) -> mathutils.Matrix 
     return ctx.to_export(w_bl)
 
 
-def _local_matrix_export(ctx: ExportContext, node: SceneNode, parent: SceneNode | None) -> mathutils.Matrix | None:
+def _local_matrix_export(ctx: "ExportContext", node: SceneNode, parent: SceneNode | None) -> mathutils.Matrix | None:
     """Local matrix in EXPORT space for this node, or None if node has no transform."""
     world_e = _node_world_export(ctx, node)
     if world_e is None:
@@ -65,7 +69,7 @@ def _local_matrix_export(ctx: ExportContext, node: SceneNode, parent: SceneNode 
     return local_e
 
 
-def resolve_matrices(ctx: ExportContext) -> None:
+def resolve_matrices(ctx: "ExportContext") -> None:
     """Compute local EXPORT-space matrices for all nodes and store them on the node."""
     rep = ctx.section("matrices")
     rep.debug("Matrix resolve start")

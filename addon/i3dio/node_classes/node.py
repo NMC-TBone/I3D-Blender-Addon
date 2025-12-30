@@ -1,5 +1,5 @@
 from __future__ import annotations  # Enables python 4.0 annotation typehints fx. class self-referencing
-from abc import (ABC, abstractmethod)
+from abc import ABC, abstractmethod
 from inspect import isabstract
 import logging
 from typing import ClassVar
@@ -7,7 +7,7 @@ import math
 import mathutils
 import bpy
 
-from .. import (debugging, utility, xml_i3d)
+from .. import debugging, utility, xml_i3d
 
 from ..i3d import I3D
 
@@ -18,7 +18,7 @@ class Node(ABC):
         if isabstract(cls):
             return  # Skip abstract base classes
         super().__init_subclass__(**kwargs)
-        missing = [var for var in ('ELEMENT_TAG', 'ID_FIELD_NAME', 'NAME_FIELD_NAME') if not hasattr(cls, var)]
+        missing = [var for var in ("ELEMENT_TAG", "ID_FIELD_NAME", "NAME_FIELD_NAME") if not hasattr(cls, var)]
         if missing:
             raise TypeError(f"{cls.__name__} must define: {', '.join(missing)}")
 
@@ -46,8 +46,9 @@ class Node(ABC):
         raise NotImplementedError
 
     def _set_logging_output_name_field(self):
-        return debugging.ObjectNameAdapter(logging.getLogger(f"{__name__}.{type(self).__name__}"),
-                                           {'object_name': self.name})
+        return debugging.ObjectNameAdapter(
+            logging.getLogger(f"{__name__}.{type(self).__name__}"), {"object_name": self.name}
+        )
 
     def _create_xml_element(self):
         self.logger.debug(f"Filling out basic attributes, {{name='{self.name}', nodeId='{self.id}'}}")
@@ -71,24 +72,26 @@ class Node(ABC):
 
 
 class SceneGraphNode(Node):
-    NAME_FIELD_NAME: ClassVar[str] = 'name'
-    ID_FIELD_NAME: ClassVar[str] = 'nodeId'
+    NAME_FIELD_NAME: ClassVar[str] = "name"
+    ID_FIELD_NAME: ClassVar[str] = "nodeId"
 
-    def __init__(self, id_: int,
-                 blender_object: bpy.types.Object | bpy.types.Collection | None,
-                 i3d: I3D,
-                 parent: SceneGraphNode | None = None,
-                 ):
+    def __init__(
+        self,
+        id_: int,
+        blender_object: bpy.types.Object | bpy.types.Collection | None,
+        i3d: I3D,
+        parent: SceneGraphNode | None = None,
+    ):
         self.children: list[SceneGraphNode] = []
         self.blender_object = blender_object
         self.parent = parent
         self.defer_transform: bool = False  # bones may change parent which makes the first calculated transform invalid
-        self.xml_elements: dict[str, xml_i3d.XML_Element | None] = {'Node': None}
+        self.xml_elements: dict[str, xml_i3d.XML_Element | None] = {"Node": None}
 
         self._name = self.blender_object.name
-        prefix = i3d.settings.get('object_sorting_prefix', "")
+        prefix = i3d.settings.get("object_sorting_prefix", "")
         if prefix and (prefix_index := self._name.find(prefix)) > -1 and prefix_index < len(self._name) - 1:
-            self._name = self._name[prefix_index + 1:]
+            self._name = self._name[prefix_index + 1 :]
 
         super().__init__(id_, i3d, parent)
 
@@ -99,7 +102,7 @@ class SceneGraphNode(Node):
         except AttributeError:
             pass
 
-        if "ANIMATIONS" in i3d.settings['features_to_export'] and isinstance(self.blender_object, bpy.types.Object):
+        if "ANIMATIONS" in i3d.settings["features_to_export"] and isinstance(self.blender_object, bpy.types.Object):
             self.i3d.collect_animation_link(self)
 
         self.add_i3d_mapping_to_xml()
@@ -112,34 +115,18 @@ class SceneGraphNode(Node):
 
     @property
     def element(self) -> xml_i3d.XML_Element | None:
-        return self.xml_elements['Node']
+        return self.xml_elements["Node"]
 
     @element.setter
     def element(self, value):
-        self.xml_elements['Node'] = value
+        self.xml_elements["Node"] = value
 
     def __str__(self):
         return f"{self.name}"
 
     def _write_properties(self):
         # Write general node properties (Transform properties in Giants Engine)
-        try:
-            xml_i3d.write_i3d_properties(self.blender_object, self.blender_object.i3d_attributes, self.xml_elements)
-        except AttributeError:
-            # Not all nodes has general node properties, such as collections.
-            pass
-
-        # Try to write node specific properties, not all nodes have these (Such as cameras or collections)
-        try:
-            data = self.blender_object.data
-        except AttributeError:
-            self.logger.debug(f'Is a "{type(self.blender_object).__name__}", which does not have "data"')
-        else:
-            if not isinstance(self, TransformGroupNode):
-                try:
-                    xml_i3d.write_i3d_properties(data, self.blender_object.data.i3d_attributes, self.xml_elements)
-                except AttributeError:
-                    self.logger.debug('Has no data specific attributes')
+        pass
 
     def _write_user_attributes(self):
         try:  # Only write attributes if list is not empty
@@ -199,30 +186,33 @@ class SceneGraphNode(Node):
         self.logger.debug(f"translation is {translation}")
         if not utility.vector_compare(translation, mathutils.Vector((0, 0, 0))):
             translation = "{0:.6g} {1:.6g} {2:.6g}".format(
-                *[x * bpy.context.scene.unit_settings.scale_length for x in translation])
+                *[x * bpy.context.scene.unit_settings.scale_length for x in translation]
+            )
 
-            self._write_attribute('translation', translation)
+            self._write_attribute("translation", translation)
             self.logger.debug(f"has translation: [{translation}]")
         else:
             self.logger.debug("translation is default")
 
         # Rotation, no unit scaling since it will always be degrees.
-        rotation = [math.degrees(axis) for axis in matrix.to_euler('XYZ')]
+        rotation = [math.degrees(axis) for axis in matrix.to_euler("XYZ")]
         if not utility.vector_compare(mathutils.Vector(rotation), mathutils.Vector((0, 0, 0))):
             rotation = "{0:.6g} {1:.6g} {2:.6g}".format(*rotation)
-            self._write_attribute('rotation', rotation)
+            self._write_attribute("rotation", rotation)
             self.logger.debug(f"has rotation(degrees): [{rotation}]")
 
         # Scale
         if matrix.is_negative:
-            self.logger.error("has one or more negative scaling components, "
-                              "which is not supported in Giants Engine. Scale reset to (1, 1, 1)")
+            self.logger.error(
+                "has one or more negative scaling components, "
+                "which is not supported in Giants Engine. Scale reset to (1, 1, 1)"
+            )
         else:
             scale = matrix.to_scale()
             if not utility.vector_compare(scale, mathutils.Vector((1, 1, 1))):
                 scale = "{0:.6g} {1:.6g} {2:.6g}".format(*scale)
 
-                self._write_attribute('scale', scale)
+                self._write_attribute("scale", scale)
                 self.logger.debug(f"has scale: [{scale}]")
 
     def populate_xml_element(self):
@@ -266,21 +256,26 @@ class SceneGraphNode(Node):
             new_parent.element.append(self.element)
         else:
             self.i3d.scene_root_nodes.append(self)
-            self.i3d.xml_elements['Scene'].append(self.element)
+            self.i3d.xml_elements["Scene"].append(self.element)
 
     def add_i3d_mapping_to_xml(self):
         try:
-            if getattr(self.blender_object.i3d_mapping, 'is_mapped'):
+            if getattr(self.blender_object.i3d_mapping, "is_mapped"):
                 self.i3d.i3d_mapping.append(self)
         except AttributeError:
             pass
 
 
 class TransformGroupNode(SceneGraphNode):
-    ELEMENT_TAG: ClassVar[str] = 'TransformGroup'
+    ELEMENT_TAG: ClassVar[str] = "TransformGroup"
 
-    def __init__(self, id_: int, empty_object: bpy.types.Object | bpy.types.Collection,
-                 i3d: I3D, parent: SceneGraphNode | None = None):
+    def __init__(
+        self,
+        id_: int,
+        empty_object: bpy.types.Object | bpy.types.Collection,
+        i3d: I3D,
+        parent: SceneGraphNode | None = None,
+    ):
         super().__init__(id_=id_, blender_object=empty_object, i3d=i3d, parent=parent)
 
     @property
@@ -300,18 +295,18 @@ class TransformGroupNode(SceneGraphNode):
         except AttributeError:
             return
 
-        if not reference_path.lower().endswith('.i3d'):
+        if not reference_path.lower().endswith(".i3d"):
             self.logger.warning(
                 f"Reference path {reference_path!r} does not end with '.i3d'. Reference files must be .i3d files."
             )
             return
         self.logger.debug(f"Reference path: {reference_path!r}")
-        self._write_attribute('referenceId', self.i3d.add_file_reference(reference_path))
+        self._write_attribute("referenceId", self.i3d.add_file_reference(reference_path))
         if not (runtime_loaded := self.blender_object.i3d_reference.runtime_loaded):
             # Default is True so only write if False
-            self._write_attribute('referenceRuntimeLoaded', runtime_loaded)
-        if (child_path := self.blender_object.i3d_reference.child_path):
-            self._write_attribute('referenceChildPath', child_path)
+            self._write_attribute("referenceRuntimeLoaded", runtime_loaded)
+        if child_path := self.blender_object.i3d_reference.child_path:
+            self._write_attribute("referenceChildPath", child_path)
 
     def populate_xml_element(self):
         super().populate_xml_element()
@@ -319,7 +314,7 @@ class TransformGroupNode(SceneGraphNode):
 
 
 class LightNode(SceneGraphNode):
-    ELEMENT_TAG: ClassVar[str] = 'Light'
+    ELEMENT_TAG: ClassVar[str] = "Light"
 
     def __init__(self, id_: int, light_object: bpy.types.Object, i3d: I3D, parent: SceneGraphNode or None = None):
         super().__init__(id_=id_, blender_object=light_object, i3d=i3d, parent=parent)
@@ -333,7 +328,7 @@ class LightNode(SceneGraphNode):
 
 
 class CameraNode(SceneGraphNode):
-    ELEMENT_TAG: ClassVar[str] = 'Camera'
+    ELEMENT_TAG: ClassVar[str] = "Camera"
 
     def __init__(self, id_: int, camera_object: bpy.types.Object, i3d: I3D, parent: SceneGraphNode or None = None):
         super().__init__(id_=id_, blender_object=camera_object, i3d=i3d, parent=parent)
@@ -344,12 +339,12 @@ class CameraNode(SceneGraphNode):
 
     def populate_xml_element(self):
         camera = self.blender_object.data
-        self._write_attribute('fov', camera.lens)
-        self._write_attribute('nearClip', camera.clip_start)
-        self._write_attribute('farClip', camera.clip_end)
+        self._write_attribute("fov", camera.lens)
+        self._write_attribute("nearClip", camera.clip_start)
+        self._write_attribute("farClip", camera.clip_end)
         self.logger.info(f"FOV: '{camera.lens}', Near Clip: '{camera.clip_start}', Far Clip: '{camera.clip_end}'")
-        if camera.type == 'ORTHO':
-            self._write_attribute('orthographic', True)
-            self._write_attribute('orthographicHeight', camera.ortho_scale)
+        if camera.type == "ORTHO":
+            self._write_attribute("orthographic", True)
+            self._write_attribute("orthographicHeight", camera.ortho_scale)
             self.logger.info(f"Orthographic camera with height '{camera.ortho_scale}'")
         super().populate_xml_element()

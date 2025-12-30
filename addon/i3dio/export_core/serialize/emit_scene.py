@@ -2,19 +2,20 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import mathutils
 
 from ... import xml_i3d
 from ...utility import near_one3, near_zero_euler, near_zero_vec
-from ..ctx import ExportContext
 from ..ir import node_emit_tag
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 
 def _write_transform(ctx: ExportContext, elem, local_export: mathutils.Matrix | None) -> None:
-    """
-    local_export is expected to already be in EXPORT space.
-    """
+    """local_export is expected to already be in EXPORT space."""
     if local_export is None:
         return
 

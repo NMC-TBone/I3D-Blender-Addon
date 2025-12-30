@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 from xml.sax.saxutils import escape as xml_escape
 
 import bpy
 
-from ..ctx import ExportContext
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 
-def _iter_tree_preorder(ctx: ExportContext):
+def _iter_tree_preorder(ctx: "ExportContext"):
     """Yield node ids in root-first preorder."""
     nodes = ctx.ir.scene_nodes
     stack = list(reversed(ctx.ir.roots))  # reverse so first root is processed first
@@ -20,7 +22,7 @@ def _iter_tree_preorder(ctx: ExportContext):
         stack.extend(reversed(kids))
 
 
-def _build_index_paths(ctx: ExportContext) -> dict[int, str]:
+def _build_index_paths(ctx: "ExportContext") -> dict[int, str]:
     """
     Build mapping node index strings like:
       root: "0>"
@@ -65,7 +67,7 @@ def _detect_newline(lines: list[str]) -> str:
 
 
 def _find_or_insert_block(
-    ctx: ExportContext,
+    ctx: "ExportContext",
     lines: list[str],
     *,
     open_tag: str,
@@ -122,7 +124,7 @@ def _xml_attr(s: str) -> str:
     return xml_escape(s, {'"': "&quot;"})
 
 
-def emit_i3d_mappings(ctx: ExportContext) -> None:
+def emit_i3d_mappings(ctx: "ExportContext") -> None:
     rep = ctx.section("i3dMappings")
     file_path_raw = ctx.settings.get("i3d_mapping_file_path", "")
     if not file_path_raw:

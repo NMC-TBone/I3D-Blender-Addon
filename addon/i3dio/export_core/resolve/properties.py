@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import bpy
 import mathutils
 
-from ..ctx import ExportContext
 from ..ir import NodeKind, SceneNode, XmlBuckets
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 _EPS_FLOAT = 1e-6
 _EPS_VEC = 1e-6
@@ -50,7 +52,7 @@ class _SkipSentinel:
 _SKIP = _SkipSentinel()
 
 
-def resolve_properties(ctx: ExportContext, node: SceneNode) -> None:
+def resolve_properties(ctx: "ExportContext", node: SceneNode) -> None:
     ref = node.blender_ref
     if not isinstance(ref, bpy.types.Object):
         return
@@ -78,7 +80,7 @@ def _collect_camera_builtin(cam: bpy.types.Camera, out: dict[str, Any]) -> None:
         out.setdefault("orthographicHeight", cam.ortho_scale)
 
 
-def _resolve_reference_path(ctx: ExportContext, node: SceneNode) -> None:
+def _resolve_reference_path(ctx: "ExportContext", node: SceneNode) -> None:
     # Only TransformGroups should carry reference info
     ref = node.blender_ref
     if node.kind != NodeKind.TRANSFORM_GROUP or not isinstance(ref, bpy.types.Object):

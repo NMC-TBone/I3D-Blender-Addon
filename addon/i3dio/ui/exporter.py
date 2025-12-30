@@ -1,15 +1,10 @@
 import bpy
-
-from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty, PointerProperty, CollectionProperty
-
+from bpy.props import BoolProperty, CollectionProperty, EnumProperty, IntProperty, PointerProperty, StringProperty
+from bpy.types import Operator, Panel
 from bpy_extras.io_utils import ExportHelper, orientation_helper
 
-from bpy.types import Operator, Panel
-
-from .. import exporter, xml_i3d
-
 from .. import __package__ as base_package
-
+from .. import exporter, xml_i3d
 
 classes = []
 
@@ -83,9 +78,9 @@ class I3D_IO_OT_export(Operator, ExportHelper):
     bl_label = "Export I3D"
     bl_options = {"UNDO", "PRESET"}  # 'PRESET' enables the preset dialog for saving settings as preset
 
-    filename_ext = xml_i3d.file_ending
+    filename_ext = xml_i3d.FILE_EXT
     filter_glob: StringProperty(
-        default=f"*{xml_i3d.file_ending}",
+        default=f"*{xml_i3d.FILE_EXT}",
         options={"HIDDEN"},
         maxlen=255,
     )
@@ -261,7 +256,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
         # This is done to allow the settings to be saved between sessions
         # Do not save collection prop since then we can use that as check if it was exported through file browser
         # Use i3d_mapping_file_path from context.scene.i3dio instead of self.i3d_mapping_file_path
-        ACCEPTED_PROPERTIES = [
+        accepted_props = [
             "selection",
             "selection_traverse_children",
             "binarize_i3d",
@@ -280,7 +275,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
             "object_sorting_prefix",
         ]
         export_props = {}
-        for prop in ACCEPTED_PROPERTIES:
+        for prop in accepted_props:
             if hasattr(self, prop):
                 value = getattr(self, prop)
                 if isinstance(value, set):

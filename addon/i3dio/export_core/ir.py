@@ -36,7 +36,7 @@ KIND_TO_TAG: dict[NodeKind, EmitTag] = {
 
 
 def node_emit_tag(node: "SceneNode") -> EmitTag:
-    return node.emit_as or KIND_TO_TAG[node.kind]
+    return node.emit_as or KIND_TO_TAG.get(node.kind, EmitTag.TRANSFORM_GROUP)
 
 
 @dataclass(slots=True)
@@ -89,3 +89,42 @@ class ExportIR:
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     roots: list[int] = field(default_factory=list)
     index: IRIndex = field(default_factory=IRIndex)
+
+    def add_node(self, node: SceneNode, *, parent_id: int | None = None) -> None:
+        """Add a pre-created SceneNode into the IR and attach it."""
+        self.scene_nodes[node.id] = node
+        self.attach(node.id, node.parent_id if parent_id is None else parent_id)
+
+    def detach(self, node_id: int) -> None:
+        """Detach node from its parent (if any)."""
+        n = self.scene_nodes[node_id]
+        if n.parent_id is None:
+            try:
+                self.roots.remove(node_id)
+            except ValueError:
+                pass
+        else:
+            if (p := self.scene_nodes.get(n.parent_id)) is not None:
+                try:
+                    p.children.remove(node_id)
+                except ValueError:
+                    pass
+        n.parent_id = None
+
+    def attach(self, node_id: int, parent_id: int | None) -> None:
+        """Attach node under parent_id (or to roots if parent_id is None)."""
+        n = self.scene_nodes[node_id]
+        # if already attached, detach first
+        if n.parent_id is not None or node_id in self.roots:
+            self.detach(node_id)
+
+        n.parent_id = parent_id
+        if parent_id is None:
+            self.roots.append(node_id)
+        else:
+            self.scene_nodes[parent_id].children.append(node_id)
+
+    def reparent(self, node_id: int, new_parent_id: int | None) -> None:
+        """Reparent node to new_parent_id, updating both roots and children lists safely."""
+        self.detach(node_id)
+        self.attach(node_id, new_parent_id)

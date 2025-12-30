@@ -1,13 +1,15 @@
-# i3dio/export_core/resolve/merge_children.py
+# i3dio/export_core/shapes/resolve/merge_children.py
 from __future__ import annotations
 
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 import bpy
 import mathutils
 
-from ...ctx import ExportContext
-from ...data.shapes.types import MeshContribution
+from ..types import MeshContribution
+
+if TYPE_CHECKING:
+    from ...ctx import ExportContext
 
 # Maximum index value for `mergeChildren` objects, used to normalize
 # generic values (g_value) for shaders. This constant is critical for:
@@ -21,7 +23,7 @@ _MAX_G = 32767
 # Merge Children is used to merge all children meshes of a single object, which are not referenced in the scene graph.
 
 
-def resolve_merge_children(ctx: ExportContext) -> None:
+def resolve_merge_children(ctx: "ExportContext") -> None:
     """
     Apply MergeChildren feature for roots collected during traversal.
 
@@ -60,7 +62,7 @@ def resolve_merge_children(ctx: ExportContext) -> None:
         # Create synthetic merged shape entry
         entry = ctx.shapes.add_merge_children(root_obj=obj)
         for mesh_obj, ref_frame, g in contributors:
-            entry.contributors.append(MeshContribution(mesh_obj, ref_frame, g))
+            entry.contributors.append(MeshContribution(mesh_obj, ref_frame, g_value=g))
 
         # Root becomes a Shape in Scene and points at shapeId
         node.xml.node["shapeId"] = entry.id

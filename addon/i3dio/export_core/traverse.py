@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import Iterable
+from collections import defaultdict
+from typing import TYPE_CHECKING, Callable, Iterable
 
 import bpy
 
 from ..utility import BlenderObject, sort_blender_objects_by_outliner_ordering
-from .ctx import ExportContext
 from .ir import NodeKind
+
+if TYPE_CHECKING:
+    from .ctx import ExportContext
+
+ChildIter = Callable[[bpy.types.Object], Iterable[bpy.types.Object]]
 
 
 def _is_excluded(obj: bpy.types.Object) -> bool:
@@ -32,15 +37,53 @@ def add_object_node(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | 
         return None
 
     return ctx.builder.add_scene_node(
-        kind=NodeKind.UNRESOLVED,
+        kind=NodeKind.UNRESOLVED,  # resolved later
         blender_ref=obj,
         parent_id=parent_id,
     )
 
 
-def build_from_collection(
-    ctx: ExportContext, collection: bpy.types.Collection, parent_id: int | None, *, force_new_nodes: bool = False
+def _add_object_with_children(
+    ctx: ExportContext,
+    obj: bpy.types.Object,
+    parent_id: int | None,
+    *,
+    child_iter: ChildIter,
+    expand_instance_collections: bool,
 ) -> None:
+    if (node_id := add_object_node(ctx, obj, parent_id)) is None:
+        return
+
+    if _is_merge_children_root(ctx, obj):
+        ctx.ir.index.merge_children_roots.append(node_id)
+        ctx.object_reporter(obj, "traverse").debug("MergeChildren root: skipping child traversal")
+        return
+    if expand_instance_collections and obj.instance_collection is not None:
+        ctx.object_reporter(obj, "traverse").debug("Expanding instance_collection %r", obj.instance_collection.name)
+        add_collection(ctx, obj.instance_collection, node_id)
+        return
+
+    for child in child_iter(obj):
+        _add_object_with_children(
+            ctx,
+            child,
+            node_id,
+            child_iter=child_iter,
+            expand_instance_collections=expand_instance_collections,
+        )
+
+
+def add_object(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None) -> None:
+    _add_object_with_children(
+        ctx,
+        obj,
+        parent_id,
+        child_iter=lambda o: sort_blender_objects_by_outliner_ordering(o.children),
+        expand_instance_collections=True,
+    )
+
+
+def build_from_collection(ctx: ExportContext, collection: bpy.types.Collection, parent_id: int | None) -> None:
     """
     Export a collection:
       - child collections first (outliner-like)
@@ -50,20 +93,15 @@ def build_from_collection(
     because they "live" in a collection.
     """
     for child_coll in collection.children.values():
-        add_collection(ctx, child_coll, parent_id, force_new_nodes=force_new_nodes)
+        add_collection(ctx, child_coll, parent_id)
 
     roots = [obj for obj in collection.objects if obj.parent is None]
     for obj in sort_blender_objects_by_outliner_ordering(roots):
-        add_object(ctx, obj, parent_id, force_new_nodes=force_new_nodes)
+        add_object(ctx, obj, parent_id)
 
 
 def add_collection(
-    ctx: ExportContext,
-    collection: bpy.types.Collection,
-    parent_id: int | None,
-    *,
-    force_new_nodes: bool = False,
-    emit_self: bool = True,
+    ctx: ExportContext, collection: bpy.types.Collection, parent_id: int | None, *, emit_self: bool = True
 ) -> None:
     """
     Add a collection and its contents.
@@ -71,14 +109,10 @@ def add_collection(
     If keep_collections_as_transformgroups: create a TransformGroup node for the collection itself.
     Otherwise: the collection is "transparent" and its children attach to the given parent_id.
 
-    force_new_nodes is used for collection instance expansion (Empty.instance_collection) so that
-    every encountered element becomes a fresh node in the export tree. (Also useful as future
-    "instance context" for transform resolution.)
-
     emit_self controls whether to create a node for the collection itself (e.g. we don't want Scene Collection with ALL)
     """
     if not emit_self or not ctx.settings.get("keep_collections_as_transformgroups", False):
-        build_from_collection(ctx, collection, parent_id, force_new_nodes=force_new_nodes)
+        build_from_collection(ctx, collection, parent_id)
         return
 
     node_id = ctx.builder.add_scene_node(
@@ -86,36 +120,7 @@ def add_collection(
         blender_ref=collection,
         parent_id=parent_id,
     )
-    build_from_collection(ctx, collection, node_id, force_new_nodes=force_new_nodes)
-
-
-def add_object(
-    ctx: ExportContext,
-    obj: bpy.types.Object,
-    parent_id: int | None,
-    *,
-    force_new_nodes: bool = False,
-) -> None:
-    """
-    Add an object node, then recurse into its children.
-
-    If the object is a collection instance (Empty.instance_collection), expand the referenced
-    collection under this object. Expansion uses force_new_nodes=True to create fresh nodes per placement.
-    """
-    if (node_id := add_object_node(ctx, obj, parent_id)) is None:
-        return  # excluded
-
-    if _is_merge_children_root(ctx, obj):
-        ctx.ir.index.merge_children_roots.append(node_id)
-        ctx.object_reporter(obj, "traverse").debug("MergeChildren root: skipping child traversal")
-        return  # skip child traversal, will be handled later
-
-    if obj.instance_collection is not None:
-        ctx.object_reporter(obj, "traverse").debug("Expanding instance_collection %r", obj.instance_collection.name)
-        add_collection(ctx, obj.instance_collection, node_id, force_new_nodes=True)
-        return
-    for child in sort_blender_objects_by_outliner_ordering(obj.children):
-        add_object(ctx, child, node_id, force_new_nodes=force_new_nodes)
+    build_from_collection(ctx, collection, node_id)
 
 
 def build_from_roots(ctx: ExportContext, roots: Iterable[BlenderObject]) -> None:
@@ -128,10 +133,10 @@ def build_from_roots(ctx: ExportContext, roots: Iterable[BlenderObject]) -> None
 
 
 def build_selected_only(ctx: ExportContext, selected_objs: list[bpy.types.Object]) -> None:
-    """Selected-only mode without child traversal. Keeps the "nearest selected parent" rule from the old exporter."""
+    """Selected-only mode without traversing unselected children. Keeps nearest-selected-parent rule."""
     selection_set = set(selected_objs)
 
-    # Build a parent map: obj -> nearest parent within selection
+    # obj -> nearest parent within selection
     parent_map: dict[bpy.types.Object, bpy.types.Object] = {}
     roots: list[bpy.types.Object] = []
 
@@ -139,63 +144,29 @@ def build_selected_only(ctx: ExportContext, selected_objs: list[bpy.types.Object
         parent = obj.parent
         while parent and parent not in selection_set:
             parent = parent.parent
-        if parent and parent in selection_set:
+        if parent:
             parent_map[obj] = parent
         else:
             roots.append(obj)
 
-    # Export roots first (outliner ordering)
+    # Build selected-children adjacency from parent_map
+    children_map: dict[bpy.types.Object, list[bpy.types.Object]] = defaultdict(list)
+    for child, parent in parent_map.items():
+        children_map[parent].append(child)
+
+    # Stable/outliner-like ordering
     roots_sorted = sort_blender_objects_by_outliner_ordering(roots)
+    for p, kids in list(children_map.items()):
+        children_map[p] = sort_blender_objects_by_outliner_ordering(kids)
 
-    # First pass: create nodes for all selected objects in a stable order.
-    # We can just export roots, but we still need the non-traversal “selected children” too.
-    # So we do a simple two-step: create node for each selected object when reached.
-    created: dict[bpy.types.Object, int | None] = {}
+    def selected_children(obj: bpy.types.Object) -> Iterable[bpy.types.Object]:
+        return children_map.get(obj, ())
 
-    def _nearest_selected_merge_root(obj: bpy.types.Object) -> bpy.types.Object | None:
-        """
-        Walk the selected-parent chain and return the first ancestor that is a MergeChildren root.
-        (If any selected ancestor is a merge root, the whole selected subtree under it is suppressed.)
-        """
-        cur = obj
-        while cur in parent_map:
-            p = parent_map[cur]
-            if _is_merge_children_root(ctx, p):
-                return p
-            cur = p
-        return None
-
-    def ensure_node(obj: bpy.types.Object) -> int | None:
-        # If obj is under a selected merge-root ancestor, suppress this node (and rely on merge pass later).
-        merge_root = _nearest_selected_merge_root(obj)
-        if merge_root is not None:
-            mid = ensure_node(merge_root)
-            if mid is None:
-                pass
-            else:
-                created[obj] = None
-                return None
-
-        if obj in created:
-            return created[obj]
-        pid: int | None = None
-        if obj in parent_map:
-            pid = ensure_node(parent_map[obj])
-            if pid is None:
-                # nearest selected parent exists but got skipped (excluded) -> skip child too
-                created[obj] = None
-                return None
-        node_id = add_object_node(ctx, obj, pid)
-        created[obj] = node_id
-
-        if node_id is not None and _is_merge_children_root(ctx, obj):
-            ctx.ir.index.merge_children_roots.append(node_id)
-            ctx.object_reporter(obj, "traverse").debug("MergeChildren root (selected-only): registered %s", node_id)
-        return node_id
-
-    for obj in roots_sorted:
-        ensure_node(obj)
-
-    # Also ensure any non-root selected objects get created (if selection list isn't sorted by hierarchy)
-    for obj in sort_blender_objects_by_outliner_ordering(selected_objs):
-        ensure_node(obj)
+    for root in roots_sorted:
+        _add_object_with_children(
+            ctx,
+            root,
+            parent_id=None,
+            child_iter=selected_children,
+            expand_instance_collections=True,
+        )

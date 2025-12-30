@@ -1,3 +1,4 @@
+# i3dio/export_core/tables/files.py
 from __future__ import annotations
 
 import shutil
@@ -7,12 +8,13 @@ from typing import TYPE_CHECKING, Literal
 
 import bpy
 
-from .... import utility
-from ...ids import IdKind
+from ... import utility
+from ..ids import IdKind
+from .base import IdEntryTable
 
 if TYPE_CHECKING:
-    from ...ctx import ExportContext
-    from ...reporting import Reporter
+    from ..ctx import ExportContext
+    from ..reporting import Reporter
 
 
 FileKind = Literal["image", "shader", "reference", "generic"]
@@ -35,7 +37,7 @@ class FileEntry:
 
 
 @dataclass(slots=True)
-class FileTable:
+class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
     """
     Modern replacement for the old Node-based File/Image/Shader/Reference system.
 
@@ -48,19 +50,16 @@ class FileTable:
     _by_key: dict[tuple[FileKind, str], int] = field(default_factory=dict)
     _entries: dict[int, FileEntry] = field(default_factory=dict)
 
-    # ------------------------
-    # registration / lookup
-    # ------------------------
+    def _alloc_entry(self, *, key: tuple[FileKind, str], kind: FileKind, blender_path: str) -> int:
+        fid = self.ctx.ids.alloc(IdKind.FILE)
+        self.register(key=key, entry_id=fid, entry=FileEntry(id=fid, kind=kind, blender_path=blender_path))
+        return fid
 
     def add(self, *, kind: FileKind, blender_path: str) -> int:
         key = (kind, blender_path)
-        if (fid := self._by_key.get(key)) is not None:
+        if (fid := self.get_id(key)) is not None:
             return fid
-
-        fid = self.ctx.ids.alloc(IdKind.FILE)
-        self._by_key[key] = fid
-        self._entries[fid] = FileEntry(id=fid, kind=kind, blender_path=blender_path)
-        return fid
+        return self._alloc_entry(key=key, kind=kind, blender_path=blender_path)
 
     def add_reference(self, blender_path: str) -> int:
         return self.add(kind="reference", blender_path=blender_path)
@@ -71,12 +70,7 @@ class FileTable:
     def add_shader(self, blender_path: str) -> int:
         return self.add(kind="shader", blender_path=blender_path)
 
-    def entries(self) -> list[FileEntry]:
-        return [self._entries[k] for k in sorted(self._entries)]
-
-    # ------------------------
     # finalize / resolve / copy
-    # ------------------------
 
     def finalize(self) -> None:
         """

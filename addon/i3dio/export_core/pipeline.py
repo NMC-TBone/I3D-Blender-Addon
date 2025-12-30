@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import bpy
+from typing import TYPE_CHECKING
 
 from . import traverse
-from .ctx import ExportContext
 from .resolve import resolve_all
 from .serialize.emit_i3d_mappings import emit_i3d_mappings
 from .serialize.write_i3d import write_i3d
+
+if TYPE_CHECKING:
+    from .ctx import ExportContext
 
 
 def run_export(ctx: ExportContext, *, context: bpy.types.Context) -> None:

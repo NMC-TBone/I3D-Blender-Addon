@@ -1,10 +1,14 @@
 # i3dio/export_core/resolve/kinds.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import bpy
 
-from ..ctx import ExportContext
 from ..ir import NodeKind, SceneNode
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 _OBJECT_TYPE_TO_KIND: dict[str, NodeKind] = {
     "CAMERA": NodeKind.CAMERA,

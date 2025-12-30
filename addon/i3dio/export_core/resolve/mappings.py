@@ -1,11 +1,15 @@
 # i3dio/export_core/resolve/mappings.py
 from __future__ import annotations
 
-from ..ctx import ExportContext
+from typing import TYPE_CHECKING
+
 from ..ir import NodeKind, SceneNode
 
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
-def finalize_i3d_mapping_for_node(ctx: ExportContext, node: SceneNode) -> None:
+
+def finalize_i3d_mapping_for_node(ctx: "ExportContext", node: SceneNode) -> None:
     """
     Tag nodes that should be included in i3dMappings export.
 

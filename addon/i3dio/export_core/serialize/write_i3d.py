@@ -1,12 +1,16 @@
 # i3dio/export_core/serialize/write_i3d.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ... import xml_i3d
-from ..ctx import ExportContext
+from ..shapes.serialize.indexed_triangle_set_stream import write_its_stream
 from .emit_files import emit_files
 from .emit_materials import emit_materials
 from .emit_scene import emit_scene
-from .shapes.emit_shapes import emit_shapes
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 
 def write_i3d(ctx: ExportContext) -> None:
@@ -17,8 +21,7 @@ def write_i3d(ctx: ExportContext) -> None:
     emit_files(ctx, files_elem)
     mat_elem = xml_i3d.SubElement(root, "Materials")
     emit_materials(ctx, mat_elem)
-    shapes_elem = xml_i3d.SubElement(root, "Shapes")
-    emit_shapes(ctx, shapes_elem)
+    xml_i3d.SubElement(root, "Shapes")
 
     xml_i3d.SubElement(root, "Dynamics")
 
@@ -28,4 +31,16 @@ def write_i3d(ctx: ExportContext) -> None:
     xml_i3d.SubElement(root, "Animation")
     xml_i3d.SubElement(root, "UserAttributes")
 
-    xml_i3d.export_to_i3d_file(root, ctx.filepath)
+    def _shapes_writer(f):
+        for built in ctx.shapes.iter_built():
+            write_its_stream(f, built, indent="    ")
+
+    xml_i3d.export_to_i3d_file(
+        root=root,
+        file_path=ctx.filepath,
+        shapes_writer=_shapes_writer,
+        encoding="iso-8859-1",
+        xml_declaration=True,
+        pretty=ctx.is_dev,
+        skip_indent_tags={"Shapes"},
+    )

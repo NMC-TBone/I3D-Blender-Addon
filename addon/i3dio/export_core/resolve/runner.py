@@ -2,19 +2,22 @@
 from __future__ import annotations
 
 from collections import Counter
+from typing import TYPE_CHECKING
 
-from ..ctx import ExportContext
+from ..shapes.resolve.assemble import resolve_shapes_build
+from ..shapes.resolve.link import resolve_shape_links
+from ..shapes.resolve.merge_children import resolve_merge_children
 from .kinds import resolve_kind_for_node
 from .mappings import finalize_i3d_mapping_for_node
 from .matrices import resolve_matrices
 from .names import finalize_name_for_node
 from .properties import resolve_properties
-from .shapes.build import resolve_shapes_build
-from .shapes.link import resolve_shape_link
-from .shapes.merge_children import resolve_merge_children
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
 
 
-def resolve_all(ctx: ExportContext) -> None:
+def resolve_all(ctx: "ExportContext") -> None:
     """
     Apply IR resolve/finalize passes after traversal and before serialization.
 
@@ -29,9 +32,9 @@ def resolve_all(ctx: ExportContext) -> None:
         finalize_name_for_node(ctx, node)
 
     resolve_merge_children(ctx)
+    resolve_shape_links(ctx)
 
     for node in ctx.ir.scene_nodes.values():
-        resolve_shape_link(ctx, node)
         resolve_properties(ctx, node)
         finalize_i3d_mapping_for_node(ctx, node)
 
