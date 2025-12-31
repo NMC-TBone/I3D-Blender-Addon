@@ -1,8 +1,9 @@
 # i3dio/export_core/pipeline.py
 from __future__ import annotations
 
-import bpy
 from typing import TYPE_CHECKING
+
+import bpy
 
 from . import traverse
 from .resolve import resolve_all
