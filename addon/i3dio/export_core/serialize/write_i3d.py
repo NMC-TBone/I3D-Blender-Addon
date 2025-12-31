@@ -4,10 +4,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ... import xml_i3d
-from ..shapes.serialize.indexed_triangle_set_stream import write_its_stream
 from .emit_files import emit_files
 from .emit_materials import emit_materials
 from .emit_scene import emit_scene
+from .indexed_triangle_set_stream import write_its_stream
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext

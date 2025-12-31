@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .... import xml_i3d
+from ... import xml_i3d
 
 if TYPE_CHECKING:
-    from ..its.built import BuiltITS
+    from ..shapes.its.built import BuiltITS
 
 CHUNK_LINES = 50_000  # number of lines to buffer before writing to file
 
