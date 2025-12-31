@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Iterable
 import bpy
 import mathutils
 
-from ..types import MeshContribution
+from .. import ShapeContributor
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
 
 # Maximum index value for `mergeChildren` objects, used to normalize
-# generic values (g_value) for shaders. This constant is critical for:
+# generic values (generic_value01) for shaders. This constant is critical for:
 # - Calculating normalized indices for motion paths or animations (e.g., vertex animation textures).
 # - Controlling visibility of elements via the `hideByIndex` shader parameter.
 # NOTE: The value must match the expected range in the shaders (e.g., [0..32767]).
@@ -62,7 +62,7 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
         # Create synthetic merged shape entry
         entry = ctx.shapes.add_merge_children(root_obj=obj)
         for mesh_obj, ref_frame, g in contributors:
-            entry.contributors.append(MeshContribution(mesh_obj, ref_frame, g_value=g))
+            entry.contributors.append(ShapeContributor(mesh_obj, ref_frame, generic_value01=g))
 
         # Root becomes a Shape in Scene and points at shapeId
         node.xml.node["shapeId"] = entry.id
@@ -76,10 +76,7 @@ def _collect_contributors(
     apply_transforms: bool,
     steps: int,
 ) -> list[tuple[bpy.types.Object, mathutils.Matrix, float]]:
-    """
-    Returns list of (mesh_obj, reference_frame, g_value).
-    Root mesh is excluded.
-    """
+    """Returns list of (mesh_obj, reference_frame, generic_value01). Root mesh is excluded."""
     root_world = root_obj.matrix_world.copy()
     out: list[tuple[bpy.types.Object, mathutils.Matrix, float]] = []
 

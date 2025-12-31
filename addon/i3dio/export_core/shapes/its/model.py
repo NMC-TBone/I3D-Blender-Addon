@@ -1,4 +1,4 @@
-# i3dio/export_core/shapes/its/built.py
+# i3dio/export_core/shapes/its/model.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -48,3 +48,19 @@ class BuiltITS:
     @property
     def triangle_count(self) -> int:
         return int(self.indices.shape[0] // 3)
+
+
+@dataclass(slots=True)
+class ItsContributorStream:
+    obj_name: str
+    loop_count: int
+
+    positions: np.ndarray  # (L,3) float32
+    normals: np.ndarray  # (L,3) float32 (mandatory)
+    uvs: list[np.ndarray]  # 0..4 each (L,2) float32
+
+    tri_loops: np.ndarray  # (T,3) int32, loop indices
+    tri_mat_id: np.ndarray  # (T,) int32, resolved materialId per tri
+
+    generic_value01: np.ndarray | None  # (L,) float32
+    bind_idx: np.ndarray | None  # (L,) int32 (or float32 if writer expects float)

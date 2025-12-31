@@ -1,4 +1,4 @@
-# i3dio/export_core/shapes/types.py
+# i3dio/export_core/shapes/model.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,12 +16,12 @@ class ShapeMode(Enum):
 
 
 @dataclass(slots=True)
-class MeshContribution:
+class ShapeContributor:
     obj: bpy.types.Object
     reference_frame: mathutils.Matrix | None  # Blender-space frame
 
     # MergeChildren / generic vertex attribute
-    g_value: float | None = None  # normalized [0..1]
+    generic_value01: float | None = None  # normalized [0..1]
 
     # MergeGroup / singleblendweights
     bind_index: int | None = None  # 0..N-1

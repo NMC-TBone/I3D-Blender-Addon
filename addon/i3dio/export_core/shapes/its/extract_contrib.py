@@ -1,14 +1,14 @@
 # i3dio/export_core/shapes/its/extract_contrib.py
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import bpy
 import numpy as np
 
 from ...blender.evaluated_mesh import evaluated_mesh_for_export, free_evaluated_mesh
-from ..types import MeshContribution
+from .. import ShapeContributor
+from . import ItsContributorStream
 from .material_resolve import choose_fallback_material_id, resolve_slots
 
 if TYPE_CHECKING:
@@ -17,28 +17,12 @@ if TYPE_CHECKING:
 MAX_UV_LAYERS = 4
 
 
-@dataclass(slots=True)
-class ContribITS:
-    obj_name: str
-    loop_count: int
-
-    positions: np.ndarray  # (L,3) float32
-    normals: np.ndarray  # (L,3) float32 (mandatory)
-    uvs: list[np.ndarray]  # 0..4 each (L,2) float32
-
-    tri_loops: np.ndarray  # (T,3) int32, loop indices
-    tri_mat_id: np.ndarray  # (T,) int32, resolved materialId per tri
-
-    g: np.ndarray | None  # (L,) float32
-    bi: np.ndarray | None  # (L,) int32 (or float32 if writer expects float)
-
-
 def extract_contrib_its(
     ctx: "ExportContext",
-    contrib: MeshContribution,
+    contrib: ShapeContributor,
     want_g: bool,
     want_bi: bool,
-) -> ContribITS | None:
+) -> ItsContributorStream | None:
     obj = contrib.obj
     if not isinstance(obj, bpy.types.Object) or obj.type != "MESH":
         return None
@@ -120,15 +104,15 @@ def extract_contrib_its(
                 warned.add(obj.name)
 
         # ---- merge-children g ----
-        g = None
+        generic_value01 = None
         if want_g:
-            g = np.full((num_loops,), float(contrib.g_value or 0.0), dtype=np.float32)
+            generic_value01 = np.full((num_loops,), float(contrib.generic_value01 or 0.0), dtype=np.float32)
 
-        bi = None
+        bind_idx = None
         if want_bi:
-            bi = np.full((num_loops,), int(contrib.bind_index or 0), dtype=np.int32)
+            bind_idx = np.full((num_loops,), int(contrib.bind_index or 0), dtype=np.int32)
 
-        return ContribITS(
+        return ItsContributorStream(
             obj_name=obj.name,
             loop_count=num_loops,
             positions=positions,
@@ -136,8 +120,8 @@ def extract_contrib_its(
             uvs=uvs,
             tri_loops=tri_loops,
             tri_mat_id=tri_mat_id,
-            g=g,
-            bi=bi,
+            generic_value01=generic_value01,
+            bind_idx=bind_idx,
         )
 
     finally:

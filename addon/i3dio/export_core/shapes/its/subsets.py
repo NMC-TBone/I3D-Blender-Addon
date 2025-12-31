@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .built import BuiltSubset
+from . import BuiltSubset
 
 
 def build_indices_and_subsets(

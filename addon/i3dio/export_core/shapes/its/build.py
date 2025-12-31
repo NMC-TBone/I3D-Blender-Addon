@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .built import BuiltITS
-from .extract_contrib import ContribITS, extract_contrib_its
+from . import BuiltITS, ItsContributorStream
+from .extract_contrib import extract_contrib_its
 from .subsets import build_indices_and_subsets
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     want_g = vattrs.get("generic", False)
     want_bi = vattrs.get("singleblendweights", False)
 
-    contrib_streams: list[ContribITS] = []
+    contrib_streams: list[ItsContributorStream] = []
     for contrib in entry.contributors:
         stream = extract_contrib_its(ctx, contrib, want_g=want_g, want_bi=want_bi)
         if stream is not None:
@@ -80,10 +80,10 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
                     uvs_out[li][vs] = 0.0
 
         if want_g and g_out is not None:
-            g_out[vs] = 0.0 if s.g is None else s.g
+            g_out[vs] = 0.0 if s.generic_value01 is None else s.generic_value01
 
         if want_bi and bi_out is not None:
-            bi_out[vs] = 0 if s.bi is None else s.bi
+            bi_out[vs] = 0 if s.bind_idx is None else s.bind_idx
 
         ts = slice(t_offset, t_offset + tc)
         tri_loops_all[ts] = s.tri_loops + np.int32(v_offset)

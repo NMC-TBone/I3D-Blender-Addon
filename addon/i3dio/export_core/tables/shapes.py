@@ -1,4 +1,4 @@
-# i3dio/export_core/shapes/table.py
+# i3dio/export_core/tables/shapes.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,9 +8,9 @@ import bpy
 
 from ..ids import IdKind
 from ..ir import NodeKind, SceneNode, XmlBuckets
+from ..shapes import ShapeContributor, ShapeMode
+from ..shapes.its import BuiltITS
 from ..shapes.its.build import build_indexed_triangle_set
-from ..shapes.its.built import BuiltITS
-from ..shapes.types import MeshContribution, ShapeMode
 from .base import IdEntryTable
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ class ShapeEntry:
     key: ShapeKey
     name: str
     mode: ShapeMode
-    contributors: list[MeshContribution] = field(default_factory=list)
+    contributors: list[ShapeContributor] = field(default_factory=list)
     xml: XmlBuckets = field(default_factory=XmlBuckets)
 
 
@@ -79,7 +79,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         if (sid := self.get_id(key)) is not None:
             return sid
         entry = self._alloc_entry(key=key, name=mesh.name, mode=ShapeMode.NORMAL)
-        entry.contributors.append(MeshContribution(obj=obj, reference_frame=None))
+        entry.contributors.append(ShapeContributor(obj=obj, reference_frame=None))
         return entry.id
 
     def add_merge_children(self, root_obj: bpy.types.Object) -> ShapeEntry:

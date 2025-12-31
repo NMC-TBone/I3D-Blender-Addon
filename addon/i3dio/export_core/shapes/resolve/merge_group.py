@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import bpy
 
 from ...ir import NodeKind
-from ...tables.shapes import MeshContribution
+from ...tables.shapes import ShapeContributor
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
@@ -68,10 +68,10 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             ref = n.blender_ref
             if isinstance(ref, bpy.types.Object) and ref.type == "MESH" and isinstance(ref.data, bpy.types.Mesh):
                 entry.contributors.append(
-                    MeshContribution(
+                    ShapeContributor(
                         obj=ref,
                         reference_frame=root_frame,
-                        g_value=None,
+                        generic_value01=None,
                         bind_index=bind_index,
                     )
                 )
