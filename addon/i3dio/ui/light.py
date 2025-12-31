@@ -13,7 +13,7 @@ from bpy.props import (
 )
 
 from .helper_functions import i3d_property
-from ..xml_i3d import i3d_max
+from ..xml_i3d import I3D_MAX as i3d_max
 
 from . import presets
 

@@ -14,7 +14,7 @@ from bpy.props import (
 from bpy.app.handlers import (persistent, load_post)
 
 from ..utility import get_fs_data_path
-from ..xml_i3d import i3d_max
+from ..xml_i3d import I3D_MAX as i3d_max
 from .shader_parser import (get_shader_dict, ShaderParameter, ShaderTexture)
 from .helper_functions import (detect_fs_version, is_version_compatible, humanize_template)
 from .shader_migration_utils import (migrate_variation, migrate_material_parameters, migrate_material_textures)

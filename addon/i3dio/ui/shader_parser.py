@@ -1,13 +1,13 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import bpy
-from bpy.app.handlers import (persistent, load_post)
+from bpy.app.handlers import load_post, persistent
 
 from .. import xml_i3d
 from ..utility import get_fs_data_path
-
 
 SHADERS_GAME: ShaderDict = {}
 SHADERS_CUSTOM: ShaderDict = {}
@@ -18,8 +18,8 @@ class ShaderParameter:
     name: str
     type: int
     default_value: list[float]
-    min_value: float = -xml_i3d.i3d_max
-    max_value: float = xml_i3d.i3d_max
+    min_value: float = -xml_i3d.I3D_MAX
+    max_value: float = xml_i3d.I3D_MAX
     description: str = ''
     template: str = 'default'
 
@@ -71,12 +71,11 @@ def parse_shader_parameters(parameter: xml_i3d.XML_Element) -> list[ShaderParame
     default_value = _parse_floats(parameter.attrib.get('defaultValue'))
     min_str = parameter.attrib.get('minValue')
     max_str = parameter.attrib.get('maxValue')
-    min_value = _parse_floats(min_str) if min_str else [min(-xml_i3d.i3d_max, min(default_value))] * type_length
-    max_value = _parse_floats(max_str) if max_str else [max(xml_i3d.i3d_max, max(default_value))] * type_length
-    # Blender supports only a single min/max per prop, so if all are the same, use that; else fallback to i3d_max
-    min_single = min_value[0] if all(x == min_value[0] for x in min_value) else -xml_i3d.i3d_max
-    max_single = max_value[0] if all(x == max_value[0] for x in max_value) else xml_i3d.i3d_max
-
+    min_value = _parse_floats(min_str) if min_str else [min(-xml_i3d.I3D_MAX, min(default_value))] * type_length
+    max_value = _parse_floats(max_str) if max_str else [max(xml_i3d.I3D_MAX, max(default_value))] * type_length
+    # Blender supports only a single min/max per prop, so if all are the same, use that; else fallback to I3D_MAX
+    min_single = min_value[0] if all(x == min_value[0] for x in min_value) else -xml_i3d.I3D_MAX
+    max_single = max_value[0] if all(x == max_value[0] for x in max_value) else xml_i3d.I3D_MAX
     description = parameter.attrib.get("description", "").replace("\\n", "\n")
     if parameter.attrib.get('arraySize') is not None:
         for child in parameter:
