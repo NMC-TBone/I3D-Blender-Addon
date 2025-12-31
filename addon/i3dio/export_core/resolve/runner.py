@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from ..shapes.resolve.assemble import resolve_shapes_build
 from ..shapes.resolve.link import resolve_shape_links
 from ..shapes.resolve.merge_children import resolve_merge_children
+from ..shapes.resolve.merge_group import resolve_merge_groups
 from .kinds import resolve_kind_for_node
 from .mappings import finalize_i3d_mapping_for_node
 from .matrices import resolve_matrices
@@ -32,6 +33,7 @@ def resolve_all(ctx: "ExportContext") -> None:
         finalize_name_for_node(ctx, node)
 
     resolve_merge_children(ctx)
+    resolve_merge_groups(ctx)
     resolve_shape_links(ctx)
 
     for node in ctx.ir.scene_nodes.values():

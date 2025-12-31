@@ -45,10 +45,19 @@ def resolve_shapes_build(ctx: "ExportContext") -> None:
                 n.xml.node.pop("materialIds", None)
             continue
 
+        rep.debug(
+            "Shape id=%d built: vertices=%d triangles=%d materials=%d",
+            shape_id,
+            built.vertex_count,
+            built.triangle_count,
+            len(built.material_ids),
+        )
         if built.material_ids:
             mat_ids_str = ",".join(str(mid) for mid in built.material_ids)
             for n in nodes:
                 n.xml.node["materialIds"] = mat_ids_str
+            rep.debug("  wrote materialIds=%r to %d nodes", mat_ids_str, len(nodes))
         else:  # if something previously wrote it for some reason, ensure it's gone
             for n in nodes:
                 n.xml.node.pop("materialIds", None)
+            rep.debug("  removed materialIds from %d nodes", len(nodes))

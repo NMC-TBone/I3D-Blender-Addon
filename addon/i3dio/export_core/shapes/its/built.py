@@ -44,3 +44,7 @@ class BuiltITS:
     @property
     def vertex_count(self) -> int:
         return int(self.positions.shape[0])
+
+    @property
+    def triangle_count(self) -> int:
+        return int(self.indices.shape[0] // 3)

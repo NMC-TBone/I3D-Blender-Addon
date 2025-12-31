@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import bpy
 import mathutils
 
-from ..ir import NodeKind, SceneNode, XmlBuckets
+from ..ir import EmitTag, NodeKind, SceneNode, XmlBuckets, node_emit_tag
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -63,7 +63,7 @@ def resolve_properties(ctx: "ExportContext", node: SceneNode) -> None:
 
     data = getattr(ref, "data", None)
     pg_data = getattr(data, "i3d_attributes", None) if data is not None else None
-    if pg_data is not None:
+    if pg_data is not None and node_emit_tag(node) in {EmitTag.SHAPE, EmitTag.LIGHT}:
         _collect_pg(owner=data, pg=pg_data, out=node.xml)
     _resolve_reference_path(ctx, node)
 

@@ -30,6 +30,10 @@ def _is_merge_children_root(ctx: ExportContext, obj: bpy.types.Object) -> bool:
     return "MERGE_CHILDREN" in ctx.settings.get("features_to_export", [])
 
 
+def _merge_group_index(obj: bpy.types.Object) -> int:
+    return int(getattr(obj, "i3d_merge_group_index", -1))
+
+
 def add_object_node(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None) -> int | None:
     """Create the node for an object (no recursion). Returns node_id or None if skipped."""
     if _is_excluded(obj):
@@ -62,6 +66,14 @@ def _add_object_with_children(
         ctx.object_reporter(obj, "traverse").debug("Expanding instance_collection %r", obj.instance_collection.name)
         add_collection(ctx, obj.instance_collection, node_id)
         return
+
+    ctx.object_reporter(obj, "traverse").debug("Adding children")
+    ctx.object_reporter(obj, "traverse").debug("Added object node id=%d", node_id)
+    ctx.object_reporter(obj, "traverse").debug("Checking for MergeGroup membership")
+    ctx.object_reporter(obj, "traverse").debug("merge group index=%d", _merge_group_index(obj))
+    if (mg := _merge_group_index(obj)) >= 0:
+        ctx.ir.index.merge_group_nodes_by_index.setdefault(mg, []).append(node_id)
+        ctx.object_reporter(obj, "traverse").debug("Added to MergeGroup %d", mg)
 
     for child in child_iter(obj):
         _add_object_with_children(

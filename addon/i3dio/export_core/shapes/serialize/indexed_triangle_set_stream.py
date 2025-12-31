@@ -36,6 +36,7 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     normals = built.normals
     uvs = built.uvs
     g = built.g
+    bi = built.bi
     indices = built.indices
 
     vcount = int(positions.shape[0])
@@ -61,6 +62,8 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
             line.append(f' t{li}="{_fmt2(layer[i])}"')
         if g is not None:
             line.append(f' g="{float(g[i]):.9g}"')
+        elif bi is not None:
+            line.append(f' bi="{bi[i]:d}"')
         line.append(" />\n")
         chunk.append("".join(line))
         if len(chunk) >= CHUNK_LINES:

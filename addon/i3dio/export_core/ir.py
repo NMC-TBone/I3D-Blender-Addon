@@ -77,8 +77,8 @@ class IRIndex:
     """
 
     merge_children_roots: list[int] = field(default_factory=list)  # node ids
+    merge_group_nodes_by_index: dict[int, list[int]] = field(default_factory=dict)  # mg_index -> [node ids]
     # (future)
-    # merge_group_members: dict[int, list[int]] = field(default_factory=dict) # mg_index -> [node ids]
     # skinned_mesh_nodes: list[int] = field(default_factory=list)
 
 
