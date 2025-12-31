@@ -21,7 +21,6 @@ from .helper_functions import i3d_property
 classes = []
 
 
-#
 def register(cls):
     classes.append(cls)
     return cls
