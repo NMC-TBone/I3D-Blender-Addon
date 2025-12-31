@@ -43,6 +43,7 @@ class ExportContext:
 
     builder: SceneBuilder = field(init=False)
     unit_scale: float = 1.0
+    addon_pref: bpy.types.AddonPreferences | None = None
 
     @classmethod
     def create(

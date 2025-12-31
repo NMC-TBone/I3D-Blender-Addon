@@ -1,4 +1,4 @@
-# i3dio/export_core/serialize/shapes/indexed_triangle_set_stream.py
+# i3dio/export_core/serialize/indexed_triangle_set_stream.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

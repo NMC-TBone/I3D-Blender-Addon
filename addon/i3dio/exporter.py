@@ -58,6 +58,7 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
                 conversion_matrix=axis_conversion(to_forward=axis_forward, to_up=axis_up).to_4x4(),
                 settings=settings,
             )
+            ctx.addon_pref = context.preferences.addons[__package__].preferences
 
             # Log export settings
             logger.info("Exporter settings:")
@@ -67,7 +68,7 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
             run_export(ctx, context=context)
 
             if operator.binarize_i3d:
-                _binarize_i3d(filepath, operator, logger)
+                _binarize_i3d(ctx)
 
             report_messages_to_operator(ctx, limit=10)
 
@@ -94,26 +95,35 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
     return export_data
 
 
-def _binarize_i3d(filepath: str, operator, logger: logging.Logger):
+def _binarize_i3d(ctx: ExportContext) -> None:
     """Tries to binarize the exported I3D file"""
-    if not (converter_path := bpy.context.preferences.addons[__package__].preferences.i3d_converter_path):
-        logger.error("No i3dConverter path set in preferences. Skipping binarization.")
+    rep = ctx.section("binarizer")
+    if not (converter_path := getattr(ctx.addon_pref, "i3d_converter_path", None)):
+        rep.error("No i3dConverter path set in preferences. Skipping binarization.")
         return
     converter_exe_path = Path(converter_path)
     if not converter_exe_path.exists():
-        logger.error(f"i3dConverter.exe path does not exist: {converter_exe_path!r}. Skipping binarization.")
+        rep.error(f"i3dConverter.exe path does not exist: {converter_exe_path!r}. Skipping binarization.")
         return
     if not converter_exe_path.is_file():
-        logger.error(f"i3dConverter.exe path is not a file: {converter_exe_path!r}. Skipping binarization.")
+        rep.error(f"i3dConverter.exe path is not a file: {converter_exe_path!r}. Skipping binarization.")
         return
     if not (game_path := get_fs_data_path(as_path=True).parent):
-        logger.error("No game data path set in preferences. Skipping binarization.")
+        rep.error("No game data path set in preferences. Skipping binarization.")
         return
 
-    logger.info(f"Starting binarization of {filepath!r}")
+    rep.info(f"Starting binarization of {ctx.filepath!r}")
     try:
         conversion_result = subprocess.run(
-            args=[str(converter_exe_path), "-in", str(filepath), "-out", str(filepath), "-gamePath", f"{game_path}/"],
+            args=[
+                str(converter_exe_path),
+                "-in",
+                str(ctx.filepath),
+                "-out",
+                str(ctx.filepath),
+                "-gamePath",
+                f"{game_path}/",
+            ],
             timeout=BINARIZER_TIMEOUT_IN_SECONDS,
             check=False,  # inspect stdout even on non-zero exit code
             text=True,
@@ -139,26 +149,24 @@ def _binarize_i3d(filepath: str, operator, logger: logging.Logger):
             if any(s in low for s in _unimportant):
                 return
             if low.startswith("error:"):
-                logger.error(f"  {msg}", stacklevel=2)
+                rep.error(f"  {msg}", stacklevel=2)
             elif low.startswith("warning:"):
-                logger.warning(msg, stacklevel=2)
+                rep.warning(f"  {msg}", stacklevel=2)
             else:
-                logger.info(f"   {msg}", stacklevel=2)
+                rep.info(f"   {msg}", stacklevel=2)
 
         for line in collapsed:
             _emit(line)
 
         if conversion_result.returncode != 0:  # Non-zero exit
-            operator.report({"ERROR"}, "Binarization failed. See log for details.")
+            rep.error("Binarization failed. See log for details.")
             return
-        logger.info(f'Finished binarization of "{filepath}"')
-        operator.report({"INFO"}, "Binarization completed successfully.")
+        rep.info(f'Finished binarization of "{ctx.filepath}"')
+        rep.info("Binarization completed successfully.")
 
     except FileNotFoundError:
-        logger.error(f"Invalid path to i3dConverter.exe: {converter_exe_path!r}")
+        rep.error(f"Invalid path to i3dConverter.exe: {converter_exe_path!r}")
     except subprocess.TimeoutExpired as e:
-        logger.error(f"i3dConverter.exe timed out after {BINARIZER_TIMEOUT_IN_SECONDS} seconds. Output: {e.output!r}")
-        operator.report({"ERROR"}, "Binarization timed out. See log for details.")
+        rep.error(f"i3dConverter.exe timed out after {BINARIZER_TIMEOUT_IN_SECONDS} seconds. Output: {e.output!r}")
     except Exception:
-        logger.exception("Unexpected error while running i3dConverter.exe")
-        operator.report({"ERROR"}, "Binarization crashed. See log for details.")
+        rep.error("Unexpected error while running i3dConverter.exe")
