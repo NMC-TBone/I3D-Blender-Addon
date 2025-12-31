@@ -1,25 +1,31 @@
 from __future__ import annotations
-
 from pathlib import Path
 
 import bpy
-from bpy.app.handlers import load_post, persistent
-from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, PointerProperty, StringProperty
 from bpy.types import Panel
+from bpy.props import (
+    StringProperty,
+    PointerProperty,
+    EnumProperty,
+    CollectionProperty,
+    BoolProperty,
+    FloatProperty
+)
+from bpy.app.handlers import (persistent, load_post)
 
-from .. import __package__ as base_package
 from ..utility import get_fs_data_path
-from ..xml_i3d import I3D_MAX
-from .helper_functions import detect_fs_version, humanize_template, is_version_compatible
+from ..xml_i3d import i3d_max
+from .shader_parser import (get_shader_dict, ShaderParameter, ShaderTexture)
+from .helper_functions import (detect_fs_version, is_version_compatible, humanize_template)
+from .shader_migration_utils import (migrate_variation, migrate_material_parameters, migrate_material_textures)
 from .material_templates import TEMPLATES_GROUP_NAMES
-from .shader_migration_utils import migrate_material_parameters, migrate_material_textures, migrate_variation
-from .shader_parser import ShaderParameter, ShaderTexture, get_shader_dict
+from .. import __package__ as base_package
 
-SHADER_DEFAULT = ""
+SHADER_DEFAULT = ''
 
 
 def _clone_shader_texture(tex: I3DShaderTexture) -> dict:
-    return {k: getattr(tex, k) for k in ("name", "source", "default_source")}
+    return {k: getattr(tex, k) for k in ('name', 'source', 'default_source')}
 
 
 class ShaderManager:
@@ -70,14 +76,14 @@ class ShaderManager:
 
         for variation in self.shader.variations:  # Add all variations to the collection
             attr.shader_variations.add().name = variation
-        self._add_shader_groups(["base"])  # Always add the base group (default for all shaders)
+        self._add_shader_groups(['base'])  # Always add the base group (default for all shaders)
 
     def update_variation(self, shader_variation_name: str) -> None:
         self.clear_shader_data()
         if not self.shader:
             self.attributes.shader_variation_name = SHADER_DEFAULT
             return
-        groups = self.shader.variations.get(shader_variation_name) or ["base"]
+        groups = self.shader.variations.get(shader_variation_name) or ['base']
         used_params = self._add_shader_groups(groups)
         self._cleanup_unused_params(used_params)
 
@@ -86,20 +92,16 @@ class ShaderManager:
             self.dynamic_params[parameter.name] = parameter.default_value
             ui = self.dynamic_params.id_properties_ui(parameter.name)
             ui.clear()
-            ui.update(
-                default=parameter.default_value,
-                min=parameter.min_value,
-                max=parameter.max_value,
-                description=parameter.description,
-            )
+            ui.update(default=parameter.default_value, min=parameter.min_value,
+                      max=parameter.max_value, description=parameter.description)
 
     def add_shader_texture(self, texture: ShaderTexture) -> None:
         new_texture = self.attributes.shader_material_textures.add()
         new_texture.name = texture.name
         new_texture.default_source = texture.default_file
         new_texture.template = texture.template
-        if (cached := self.cached_textures.get(new_texture.name)) and cached["source"] != new_texture.default_source:
-            new_texture.source = cached["source"]
+        if (cached := self.cached_textures.get(new_texture.name)) and cached['source'] != new_texture.default_source:
+            new_texture.source = cached['source']
 
 
 classes = []
@@ -117,14 +119,9 @@ class I3DRequiredVertexAttribute(bpy.types.PropertyGroup):
 
 @register
 class I3DShaderTexture(bpy.types.PropertyGroup):
-    name: StringProperty(default="Unnamed Texture")
-    source: StringProperty(
-        name="Texture source",
-        description="Path to the texture",
-        default="",
-        subtype="FILE_PATH",
-        options={"PATH_SUPPORTS_BLEND_RELATIVE"},
-    )
+    name: StringProperty(default='Unnamed Texture')
+    source: StringProperty(name='Texture source', description='Path to the texture', default='',
+                           subtype='FILE_PATH', options={'PATH_SUPPORTS_BLEND_RELATIVE'})
     default_source: StringProperty()
     template: StringProperty()
 
@@ -132,7 +129,6 @@ class I3DShaderTexture(bpy.types.PropertyGroup):
 @register
 class I3DShaderDynamicParams(bpy.types.PropertyGroup):
     """Dynamic container for shader parameter values (populated at runtime via id_properties)."""
-
     pass
 
 
@@ -143,25 +139,25 @@ class I3DShaderVariation(bpy.types.PropertyGroup):
 
 @register
 class I3DMaterialShader(bpy.types.PropertyGroup):
-    shader_game_version: StringProperty(options={"HIDDEN"})  # Used for migrating shaders between game versions
+    shader_game_version: StringProperty(options={'HIDDEN'})  # Used for migrating shaders between game versions
 
     def _custom_shaders_update(self, _context) -> None:
-        self["shader_name"] = SHADER_DEFAULT
+        self['shader_name'] = SHADER_DEFAULT
         ShaderManager(self.id_data).update_shader()
 
     use_custom_shaders: BoolProperty(
-        name="Use Custom Shaders",
-        description="Enable to use custom shaders instead of game shaders",
+        name='Use Custom Shaders',
+        description='Enable to use custom shaders instead of game shaders',
         default=False,
-        update=_custom_shaders_update,
+        update=_custom_shaders_update
     )
 
     def _shader_name_getter(self) -> str:
-        return self.get("shader_name", SHADER_DEFAULT)
+        return self.get('shader_name', SHADER_DEFAULT)
 
     def _shader_name_setter(self, shader_name: str) -> None:
-        if shader_name != self.get("shader_name", SHADER_DEFAULT):
-            self["shader_name"] = shader_name
+        if shader_name != self.get('shader_name', SHADER_DEFAULT):
+            self['shader_name'] = shader_name
             ShaderManager(self.id_data).update_shader()
 
     def _shader_name_search(self, _context, _search: str) -> list[str]:
@@ -169,24 +165,24 @@ class I3DMaterialShader(bpy.types.PropertyGroup):
         return [name for name in shader_dict]
 
     shader_name: StringProperty(
-        name="Shader",
-        description="The shader to use for this material",
+        name='Shader',
+        description='The shader to use for this material',
         get=_shader_name_getter,
         set=_shader_name_setter,
-        search=_shader_name_search,
+        search=_shader_name_search
     )
 
     def _variation_getter(self) -> str:
-        return self.get("shader_variation_name", SHADER_DEFAULT)
+        return self.get('shader_variation_name', SHADER_DEFAULT)
 
     def _variation_setter(self, variation_name: str) -> None:
-        if variation_name == self.get("shader_variation_name", SHADER_DEFAULT):
+        if variation_name == self.get('shader_variation_name', SHADER_DEFAULT):
             return  # No change, return to avoid RecursionError
         if variation_name in [v.name for v in self.shader_variations] or variation_name == SHADER_DEFAULT:
-            self["shader_variation_name"] = variation_name
+            self['shader_variation_name'] = variation_name
             ShaderManager(self.id_data).update_variation(variation_name)
             return
-        self["shader_variation_name"] = SHADER_DEFAULT
+        self['shader_variation_name'] = SHADER_DEFAULT
         ShaderManager(self.id_data).update_variation(SHADER_DEFAULT)
 
     def _shader_variation_name_search(self, _context, _search: str) -> list[str]:
@@ -197,7 +193,7 @@ class I3DMaterialShader(bpy.types.PropertyGroup):
         description="The selected variation for the current shader",
         get=_variation_getter,
         set=_variation_setter,
-        search=_shader_variation_name_search,
+        search=_shader_variation_name_search
     )
     shader_variations: CollectionProperty(type=I3DShaderVariation)
 
@@ -208,49 +204,41 @@ class I3DMaterialShader(bpy.types.PropertyGroup):
     use_material_slot_name: BoolProperty(
         name="Enable Material Slot Name",
         description="If checked, this material will export a material slot name",
-        default=False,
+        default=False
     )
 
     material_slot_name: StringProperty(
-        name="Material Slot Name", description="If left empty, the material name will be used instead", default=""
+        name="Material Slot Name",
+        description="If left empty, the material name will be used instead",
+        default=""
     )
 
     i3d_map = {
-        "alpha_blending": {"name": "alphaBlending", "default": False},
-        "shading_rate": {"name": "shadingRate", "default": "1x1"},
-        "refraction_map": {"name": "refractionMap", "default": False, "placement": None},
-        "refraction_type": {
-            "name": "type",
-            "default": "planar",
-            "placement": "Refractionmap",
-            "depends": [{"name": "refraction_map", "value": True}],
+        'alpha_blending': {'name': 'alphaBlending', 'default': False},
+        'shading_rate': {'name': 'shadingRate', 'default': '1x1'},
+        'refraction_map': {'name': 'refractionMap', 'default': False, 'placement': None},
+        'refraction_type': {
+            'name': 'type', 'default': 'planar', 'placement': 'Refractionmap',
+            'depends': [{'name': 'refraction_map', 'value': True}]
         },
-        "light_absorbance": {  # All in game files use 1.0, so therefor setting blender default to 1.0
-            "name": "coeff",
-            "default": 0.0,
-            "blender_default": 1.0,
-            "placement": "Refractionmap",
-            "depends": [{"name": "refraction_map", "value": True}],
+        'light_absorbance': {  # All in game files use 1.0, so therefor setting blender default to 1.0
+            'name': 'coeff', 'default': 0.0, 'blender_default': 1.0, 'placement': 'Refractionmap',
+            'depends': [{'name': 'refraction_map', 'value': True}]
         },
-        "refraction_bump_scale": {  # Most game files use 0.1, so therefor setting blender default to 0.1
-            "name": "bumpScale",
-            "default": 0.5,
-            "blender_default": 0.1,
-            "placement": "Refractionmap",
-            "depends": [{"name": "refraction_map", "value": True}],
+        'refraction_bump_scale': {  # Most game files use 0.1, so therefor setting blender default to 0.1
+            'name': 'bumpScale', 'default': 0.5, 'blender_default': 0.1, 'placement': 'Refractionmap',
+            'depends': [{'name': 'refraction_map', 'value': True}]
         },
-        "refraction_with_ssr_data": {
-            "name": "withSSRData",
-            "default": False,
-            "placement": "Refractionmap",
-            "depends": [{"name": "refraction_map", "value": True}],
-        },
+        'refraction_with_ssr_data': {
+            'name': 'withSSRData', 'default': False, 'placement': 'Refractionmap',
+            'depends': [{'name': 'refraction_map', 'value': True}]
+        }
     }
 
     alpha_blending: BoolProperty(
         name="Alpha Blending",
         description="Enable alpha blending for this material",
-        default=i3d_map["alpha_blending"]["default"],
+        default=i3d_map['alpha_blending']['default']
     )
 
     shading_rate: EnumProperty(
@@ -260,21 +248,21 @@ class I3DMaterialShader(bpy.types.PropertyGroup):
             "while higher values (e.g. 4x4) reduce shading detail"
         ),
         items=[
-            ("1x1", "1x1", "1x1"),
-            ("1x2", "1x2", "1x2"),
-            ("2x1", "2x1", "2x1"),
-            ("2x2", "2x2", "2x2"),
-            ("2x4", "2x4", "2x4"),
-            ("4x2", "4x2", "4x2"),
-            ("4x4", "4x4", "4x4"),
+            ('1x1', '1x1', '1x1'),
+            ('1x2', '1x2', '1x2'),
+            ('2x1', '2x1', '2x1'),
+            ('2x2', '2x2', '2x2'),
+            ('2x4', '2x4', '2x4'),
+            ('4x2', '4x2', '4x2'),
+            ('4x4', '4x4', '4x4')
         ],
-        default=i3d_map["shading_rate"]["default"],
+        default=i3d_map['shading_rate']['default']
     )
 
     refraction_map: BoolProperty(
         name="Refraction Map",
         description="Enable refraction for this material (e.g., glass, water effects)",
-        default=False,
+        default=False
     )
 
     refraction_type: EnumProperty(
@@ -282,41 +270,41 @@ class I3DMaterialShader(bpy.types.PropertyGroup):
         name="Refraction Type",
         description="Method used for refraction",
         items=[
-            ("planar", "Planar", "Planar refraction for flat surfaces"),
+            ('planar', 'Planar', 'Planar refraction for flat surfaces'),
         ],
-        default=i3d_map["refraction_type"]["default"],
-        options={"HIDDEN"},
+        default=i3d_map['refraction_type']['default'],
+        options={'HIDDEN'}
     )
 
     light_absorbance: FloatProperty(
         name="Absorbance Coefficient",
         description="Amount of light absorbed when passing through the material (higher = darker look)",
-        default=i3d_map["light_absorbance"]["blender_default"],
+        default=i3d_map['light_absorbance']['blender_default'],
         min=0.0,
-        max=I3D_MAX,
+        max=i3d_max
     )
 
     refraction_bump_scale: FloatProperty(
         name="Bump Scale",
         description="Intensity of the bump map distortion effect for refraction",
-        default=i3d_map["refraction_bump_scale"]["blender_default"],
+        default=i3d_map['refraction_bump_scale']['blender_default'],
         min=0.0,
-        max=I3D_MAX,
+        max=i3d_max
     )
 
     refraction_with_ssr_data: BoolProperty(
         name="SSR Data",
         description="Enable Screen Space Reflections for refraction, for more realistic glass or water effects",
-        default=i3d_map["refraction_with_ssr_data"]["default"],
+        default=i3d_map['refraction_with_ssr_data']['default']
     )
 
 
 @register
 class I3D_IO_PT_material_shader(Panel):
-    bl_space_type = "PROPERTIES"
-    bl_region_type = "WINDOW"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
     bl_label = "I3D Material & Shader Settings"
-    bl_context = "material"
+    bl_context = 'material'
 
     @classmethod
     def poll(cls, context):
@@ -332,106 +320,96 @@ class I3D_IO_PT_material_shader(Panel):
         game_version = detect_fs_version(data_path) or ""
 
         if game_version == "25":
-            layout.operator("i3dio.create_material_from_template_popup")  # TODO: Find a more suitable place for this
+            layout.operator('i3dio.create_material_from_template_popup')  # TODO: Find a more suitable place for this
 
         main_props = layout.column(align=True)
         main_props.use_property_split = True
-        main_props.prop(i3d_attributes, "shading_rate")
-        main_props.prop(i3d_attributes, "alpha_blending")
+        main_props.prop(i3d_attributes, 'shading_rate')
+        main_props.prop(i3d_attributes, 'alpha_blending')
         box = layout.box()
-        box.prop(material.i3d_attributes, "use_material_slot_name")
+        box.prop(material.i3d_attributes, 'use_material_slot_name')
         row = box.row()
         row.enabled = material.i3d_attributes.use_material_slot_name
-        row.prop(material.i3d_attributes, "material_slot_name", text="Custom Name", placeholder=material.name)
+        row.prop(material.i3d_attributes, 'material_slot_name', text="Custom Name", placeholder=material.name)
 
-        layout.separator(type="LINE")
+        layout.separator(type='LINE')
 
         row = layout.row(align=True)
         col = row.column(align=False)
 
         if not data_path or not Path(data_path).exists():
             box = col.box()
-            box.label(text="No game data path set", icon="ERROR")
-            layout.operator(
-                "preferences.addon_show", text="Open Addon Preferences...", icon="PREFERENCES"
-            ).module = base_package
+            box.label(text="No game data path set", icon='ERROR')
+            layout.operator('preferences.addon_show',
+                            text="Open Addon Preferences...", icon='PREFERENCES').module = base_package
 
         # Only "Valid" legacy key we care about is the "source" key, which is the old shader path
-        if (
-            game_version
-            and i3d_attributes.shader_game_version != game_version
-            and ("source" in i3d_attributes or i3d_attributes.shader_name != SHADER_DEFAULT)
-        ):
+        if game_version and i3d_attributes.shader_game_version != game_version and \
+                ('source' in i3d_attributes or i3d_attributes.shader_name != SHADER_DEFAULT):
             box = col.box()
             box.label(text="Old vehicleShader found:")
-            if old_shader_source := i3d_attributes.get("source"):
+            if (old_shader_source := i3d_attributes.get('source')):
                 box.label(text=old_shader_source)
             else:
                 box.label(text=i3d_attributes.shader_name)
             box.label(text="If you want to convert this shader to new format, run the operator")
-            box.operator("i3dio.udim_to_mat_template", text="Convert to Material Template...")
+            box.operator('i3dio.udim_to_mat_template', text="Convert to Material Template...")
 
         shaderdefault = i3d_attributes.shader_name == SHADER_DEFAULT
         row = col.row(align=True)
-        row.prop(i3d_attributes, "shader_name", placeholder="No Shader", icon="FILE_BLANK" if shaderdefault else "FILE")
+        row.prop(i3d_attributes, 'shader_name', placeholder="No Shader", icon='FILE_BLANK' if shaderdefault else 'FILE')
         row = row.row(align=True)
         row.enabled = any(folder.path for folder in context.scene.i3dio.custom_shader_folders)
-        row.prop(i3d_attributes, "use_custom_shaders", text="", icon="EVENT_C")
+        row.prop(i3d_attributes, 'use_custom_shaders', text="", icon='EVENT_C')
         col = col.column(align=True)
         col.enabled = i3d_attributes.shader_name != SHADER_DEFAULT
-        col.prop(i3d_attributes, "shader_variation_name", placeholder="None", icon="EVENT_V")
+        col.prop(i3d_attributes, 'shader_variation_name', placeholder="None", icon='EVENT_V')
 
         if i3d_attributes.required_vertex_attributes:
             column = layout.column(align=True)
-            column.separator(factor=2.5, type="LINE")
+            column.separator(factor=2.5, type='LINE')
             column.label(text="Required Vertex Attributes:")
             row = column.row(align=True)
             for attr in i3d_attributes.required_vertex_attributes:
-                row.label(text=attr.name, icon="DOT")
-            column.separator(factor=2.5, type="LINE")
+                row.label(text=attr.name, icon='DOT')
+            column.separator(factor=2.5, type='LINE')
 
         if not shaderdefault:
             draw_shader_group_panels(layout, material)
             draw_refraction_attributes(layout, i3d_attributes)
 
 
-def draw_shader_group_panel(
-    layout: bpy.types.UILayout,
-    idname: str,
-    header_label: str,
-    material: bpy.types.Material,
-    params: list[str],
-    textures: list[I3DShaderTexture],
-) -> None:
+def draw_shader_group_panel(layout: bpy.types.UILayout, idname: str, header_label: str, material: bpy.types.Material,
+                            params: list[str], textures: list[I3DShaderTexture]) -> None:
     if params:
         param_header, param_panel = layout.panel(idname + "_params", default_closed=False)
         param_header.label(text=f"{header_label}Parameters")
-        visualizer = any(a.module.endswith(".i3d_material_visualizer") for a in bpy.context.preferences.addons.values())
-        if idname == "shader_material_default":
+        visualizer = any(a.module.endswith('.i3d_material_visualizer') for a in bpy.context.preferences.addons.values())
+        if idname == 'shader_material_default':
             if visualizer:
                 scene_mat = bpy.context.scene.i3d_material
-                param_header.prop(scene_mat, "show_scratches", text="", icon="EVENT_S", toggle=True)
-                param_header.prop(scene_mat, "show_dirt", text="", icon="EVENT_D", toggle=True)
-                param_header.prop(scene_mat, "show_snow", text="", icon="EVENT_S", toggle=True)
-                param_header.prop(scene_mat, "show_wetness", text="", icon="EVENT_W", toggle=True)
-                param_header.separator(type="LINE")
-                param_header.prop(scene_mat, "show_wetness_mask", text="", icon="EVENT_M", toggle=True)
+                param_header.prop(scene_mat, "show_scratches", text="", icon='EVENT_S', toggle=True)
+                param_header.prop(scene_mat, "show_dirt", text="", icon='EVENT_D', toggle=True)
+                param_header.prop(scene_mat, "show_snow", text="", icon='EVENT_S', toggle=True)
+                param_header.prop(scene_mat, "show_wetness", text="", icon='EVENT_W', toggle=True)
+                param_header.separator(type='LINE')
+                param_header.prop(scene_mat, "show_wetness_mask", text="", icon='EVENT_M', toggle=True)
 
         if idname == "shader_material_brandcolor":
-            op = param_header.operator("i3dio.template_search_popup", text="", icon="EVENT_M", emboss=False)
+            op = param_header.operator('i3dio.template_search_popup', text="", icon="EVENT_M", emboss=False)
             op.is_brand = False
             op.single_param = ""
-            op = param_header.operator("i3dio.template_search_popup", text="", icon="EVENT_B", emboss=False)
+            op = param_header.operator('i3dio.template_search_popup', text="", icon="EVENT_B", emboss=False)
             op.is_brand = True
             op.single_param = ""
 
             if visualizer:
-                param_header.separator(type="LINE")
+                param_header.separator(type='LINE')
                 if material.i3d_visualized:
-                    param_header.operator("i3d_material_visualizer.sync_shader", text="", icon="EXPORT")
-                    op = param_header.operator("i3d_material_visualizer.sync_shader", text="", icon="IMPORT")
+                    param_header.operator('i3d_material_visualizer.sync_shader', text="", icon='EXPORT')
+                    op = param_header.operator('i3d_material_visualizer.sync_shader', text="", icon='IMPORT')
                     op.direction = "NODES_TO_PROPS"
-                param_header.prop(material, "i3d_visualized", text="", icon="MATERIAL", toggle=True)
+                param_header.prop(material, "i3d_visualized", text="", icon='MATERIAL', toggle=True)
 
         if not param_panel:
             return
@@ -442,17 +420,17 @@ def draw_shader_group_panel(
             row = column.row(align=True)
             row.prop(material.i3d_attributes.shader_material_params, f'["{param}"]')
             if idname == "shader_material_brandcolor":
-                op = row.operator("i3dio.template_search_popup", text="", icon="EVENT_B")
+                op = row.operator('i3dio.template_search_popup', text="", icon="EVENT_B")
                 op.is_brand = True
                 op.single_param = param
 
                 if visualizer:
                     if material.i3d_visualized:
-                        row.separator(type="LINE")
-                        op = row.operator("i3d_material_visualizer.sync_shader", text="", icon="EXPORT")
+                        row.separator(type='LINE')
+                        op = row.operator('i3d_material_visualizer.sync_shader', text="", icon='EXPORT')
                         op.direction = "PROPS_TO_NODES"
                         op.single_param = param
-                        op = row.operator("i3d_material_visualizer.sync_shader", text="", icon="IMPORT")
+                        op = row.operator('i3d_material_visualizer.sync_shader', text="", icon='IMPORT')
                         op.direction = "NODES_TO_PROPS"
                         op.single_param = param
             for _ in range(max_param_length - len(material.i3d_attributes.shader_material_params[param])):
@@ -464,8 +442,8 @@ def draw_shader_group_panel(
             return
         column = texture_panel.column(align=False)
         for texture in textures:
-            placeholder = texture.default_source if texture.default_source else "Texture not assigned"
-            column.row(align=True).prop(texture, "source", text=texture.name, placeholder=placeholder)
+            placeholder = texture.default_source if texture.default_source else 'Texture not assigned'
+            column.row(align=True).prop(texture, 'source', text=texture.name, placeholder=placeholder)
 
 
 def draw_shader_group_panels(layout: bpy.types.UILayout, material: bpy.types.Material) -> None:
@@ -500,22 +478,22 @@ def draw_shader_group_panels(layout: bpy.types.UILayout, material: bpy.types.Mat
 
 def draw_refraction_attributes(layout: bpy.types.UILayout, i3d_attributes: I3DMaterialShader) -> None:
     if i3d_attributes.shader_name not in {"exhaustShader", "oceanShader", "precipitionShader", "waterfallShader"}:
-        i3d_attributes.property_unset("refraction_map")
+        i3d_attributes.property_unset('refraction_map')
         return  # Only draw refraction attributes for specified shaders
-    header, panel = layout.panel("i3d_material_refraction", default_closed=False)
-    header.prop(i3d_attributes, "refraction_map", text="")
+    header, panel = layout.panel('i3d_material_refraction', default_closed=False)
+    header.prop(i3d_attributes, 'refraction_map', text="")
     header.label(text="Refraction Map")
     if panel:
         panel.use_property_split = True
         panel.enabled = i3d_attributes.refraction_map
-        panel.prop(i3d_attributes, "light_absorbance")
-        panel.prop(i3d_attributes, "refraction_bump_scale")
-        panel.prop(i3d_attributes, "refraction_with_ssr_data")
+        panel.prop(i3d_attributes, 'light_absorbance')
+        panel.prop(i3d_attributes, 'refraction_bump_scale')
+        panel.prop(i3d_attributes, 'refraction_with_ssr_data')
 
         if not i3d_attributes.refraction_map:
-            i3d_attributes.property_unset("light_absorbance")
-            i3d_attributes.property_unset("refraction_bump_scale")
-            i3d_attributes.property_unset("refraction_with_ssr_data")
+            i3d_attributes.property_unset('light_absorbance')
+            i3d_attributes.property_unset('refraction_bump_scale')
+            i3d_attributes.property_unset('refraction_with_ssr_data')
 
 
 DEBUG = True
@@ -540,7 +518,7 @@ def migrate_old_shader_format(file) -> None:
 
     for mat in bpy.data.materials:
         i3d_attr = mat.i3d_attributes
-        if not (old_source := i3d_attr.get("source")) or not old_source.endswith(".xml"):
+        if not (old_source := i3d_attr.get('source')) or not old_source.endswith('.xml'):
             continue  # No old source, nothing to do
 
         old_shader_path = Path(bpy.path.abspath(old_source))
@@ -553,13 +531,12 @@ def migrate_old_shader_format(file) -> None:
             continue  # No shader, nothing to do
 
         old_variation_name = ""
-        if (old_variation_index := i3d_attr.get("variation")) is not None and (
-            old_variations := i3d_attr.get("variations")
-        ) is not None:
+        if (old_variation_index := i3d_attr.get('variation')) is not None and \
+                (old_variations := i3d_attr.get('variations')) is not None:
             if 0 <= old_variation_index < len(old_variations):
-                old_variation_name = old_variations[old_variation_index].get("name")
-            del i3d_attr["variation"]  # Remove old variation index
-            del i3d_attr["variations"]  # Remove old variations list
+                old_variation_name = old_variations[old_variation_index].get('name')
+            del i3d_attr['variation']  # Remove old variation index
+            del i3d_attr['variations']  # Remove old variations list
 
         if any(old_shader_path == s.path for s in get_shader_dict().values()):
             _print(f"[ShaderUpgrade] Found game shader: {old_shader_stem} through path match")
@@ -569,7 +546,7 @@ def migrate_old_shader_format(file) -> None:
             if old_shader_stem == "vehicleShader" and not version_compatible:
                 _print("[ShaderUpgrade] Skipping vehicleShader")
                 # Store old variation name to be handled later
-                i3d_attr["temp_old_variation_name"] = old_variation_name
+                i3d_attr['temp_old_variation_name'] = old_variation_name
                 continue
             # For all other game shaders, proceed
             _print(f"[ShaderUpgrade] Found game shader: {old_shader_stem} by name. Old variation: {old_variation_name}")
@@ -585,9 +562,9 @@ def migrate_old_shader_format(file) -> None:
         else:  # No shader found
             _print(f"[ShaderUpgrade] No shader found for: {old_shader_stem}")
             continue  # No shader found, nothing to do
-        del i3d_attr["source"]  # New shader is set, remove old source
+        del i3d_attr['source']  # New shader is set, remove old source
 
-        is_incompatible_vehicle = old_shader_stem == "vehicleShader" and not version_compatible
+        is_incompatible_vehicle = (old_shader_stem == "vehicleShader" and not version_compatible)
         migrate_variation(i3d_attr, old_variation_name, is_incompatible_vehicle)
         migrate_material_parameters(i3d_attr)
         migrate_material_textures(i3d_attr)
