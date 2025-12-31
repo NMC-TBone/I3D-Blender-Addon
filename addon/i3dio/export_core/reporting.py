@@ -29,11 +29,11 @@ class Reporter:
         # Keep current style: only %-format when args are present
         return (msg % args) if args else msg
 
-    def info(self, msg: str, *args) -> None:
-        self.log.info(msg, *args, stacklevel=2)
+    def info(self, msg: str, *args, stacklevel: int = 2) -> None:
+        self.log.info(msg, *args, stacklevel=stacklevel)
 
-    def debug(self, msg: str, *args) -> None:
-        self.log.debug(msg, *args, stacklevel=2)
+    def debug(self, msg: str, *args, stacklevel: int = 2) -> None:
+        self.log.debug(msg, *args, stacklevel=stacklevel)
 
     def warning(
         self,
@@ -42,8 +42,9 @@ class Reporter:
         object_name: str | None = None,
         code: str | None = None,
         report: bool = False,
+        stacklevel: int = 2,
     ) -> None:
-        self.log.warning(msg, *args, stacklevel=2)
+        self.log.warning(msg, *args, stacklevel=stacklevel)
         text = self._msg_text(msg, args)
         obj = object_name or self._default_object_name()
         self.ctx.messages.warning(text, object_name=obj, code=code)
@@ -57,8 +58,9 @@ class Reporter:
         object_name: str | None = None,
         code: str | None = None,
         report: bool = False,
+        stacklevel: int = 2,
     ) -> None:
-        self.log.error(msg, *args, stacklevel=2)
+        self.log.error(msg, *args, stacklevel=stacklevel)
         text = self._msg_text(msg, args)
         obj = object_name or self._default_object_name()
         self.ctx.messages.error(text, object_name=obj, code=code)
@@ -72,8 +74,9 @@ class Reporter:
         object_name: str | None = None,
         code: str | None = None,
         severity: Severity = Severity.WARNING,
+        stacklevel: int = 2,
     ) -> None:
-        self.log.exception(msg, *args, stacklevel=2)
+        self.log.exception(msg, *args, stacklevel=stacklevel)
         text = self._msg_text(msg, args)
         obj = object_name or self._default_object_name()
         if severity is Severity.ERROR:

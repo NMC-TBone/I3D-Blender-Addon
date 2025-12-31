@@ -149,11 +149,11 @@ def _binarize_i3d(ctx: ExportContext) -> None:
             if any(s in low for s in _unimportant):
                 return
             if low.startswith("error:"):
-                rep.error(f"  {msg}", stacklevel=2)
+                rep.error(f"  {msg}", stacklevel=3)
             elif low.startswith("warning:"):
-                rep.warning(f"  {msg}", stacklevel=2)
+                rep.warning(f"  {msg}", stacklevel=3)
             else:
-                rep.info(f"   {msg}", stacklevel=2)
+                rep.info(f"   {msg}", stacklevel=3)
 
         for line in collapsed:
             _emit(line)
@@ -161,12 +161,12 @@ def _binarize_i3d(ctx: ExportContext) -> None:
         if conversion_result.returncode != 0:  # Non-zero exit
             rep.error("Binarization failed. See log for details.")
             return
-        rep.info(f'Finished binarization of "{ctx.filepath}"')
+        rep.info(f"Finished binarization of {ctx.filepath!r}")
         rep.info("Binarization completed successfully.")
 
     except FileNotFoundError:
-        rep.error(f"Invalid path to i3dConverter.exe: {converter_exe_path!r}")
+        rep.exception(f"Invalid path to i3dConverter.exe: {converter_exe_path!r}")
     except subprocess.TimeoutExpired as e:
-        rep.error(f"i3dConverter.exe timed out after {BINARIZER_TIMEOUT_IN_SECONDS} seconds. Output: {e.output!r}")
-    except Exception:
-        rep.error("Unexpected error while running i3dConverter.exe")
+        rep.exception(f"i3dConverter.exe timed out after {BINARIZER_TIMEOUT_IN_SECONDS} seconds. Output: {e.output!r}")
+    except Exception as e:
+        rep.exception(f"Unexpected error while running i3dConverter.exe: {e}")
