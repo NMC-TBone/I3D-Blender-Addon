@@ -65,6 +65,12 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
             for setting, value in ctx.settings.items():
                 logger.info(f"  {setting}: {value}")
 
+            if not ctx.addon_pref.fs_data_path:
+                ctx.reporter("Data Path").warning(
+                    "FS Data folder path is not set in addon preferences. Some features may not work correctly. See: "
+                    "https://stjerneidioten.github.io/I3D-Blender-Addon/installation/setup/setup.html#fs-data-folder"
+                )
+
             run_export(ctx, context=context)
 
             if operator.binarize_i3d:
