@@ -77,19 +77,24 @@ def extract_contrib_its(
 
         slot_materials = [s.material for s in ev_obj.material_slots] if ev_obj.material_slots else list(mesh.materials)
 
-        # Warn once per object if triangles reference empty/out-of-bounds slots.
+        # Warn once per object if triangles reference empty or out-of-bounds slots.
+        valid_slot_idx: np.ndarray | None = None
         if slot_materials:
-            valid = (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
-            empty_ref = False
-            if np.any(valid):
-                idxs = np.unique(tri_mat_idx[valid])
-                empty_ref = any(slot_materials[int(i)] is None for i in idxs)
-            oob_ref = not np.all(valid)
-            if empty_ref or oob_ref:
-                ctx.section("materials").warning(
-                    "[%s] Some triangles reference empty/out-of-bounds material slots; using fallback/default material",
-                    obj.name,
+            rep = ctx.object_reporter(obj, "materials")
+            valid_slot_idx = (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
+
+            if not np.all(valid_slot_idx):
+                rep.warning("Some triangles reference out-of-bounds material slots; using fallback/default material")
+
+            if np.any(valid_slot_idx):
+                # Detect empty slots among the indices that are in range.
+                slots_is_none = np.fromiter(
+                    (m is None for m in slot_materials), dtype=np.bool_, count=len(slot_materials)
                 )
+                if np.any(slots_is_none):
+                    v_idx = tri_mat_idx[valid_slot_idx]
+                    if np.any(slots_is_none[v_idx]):
+                        rep.warning("Some triangles reference empty material slots; using fallback/default material")
 
         if material_kind == MaterialKeyKind.SLOT_INDEX:
             # NORMAL shapes: keep slot indices; per-node materialIds mapping happens in assemble.
@@ -107,13 +112,15 @@ def extract_contrib_its(
 
             tri_mat_key = np.empty((num_triangles,), dtype=np.int32)
             if slot_materials:
-                valid = (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
+                valid = valid_slot_idx
+                if valid is None:
+                    valid = (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
                 tri_mat_key[valid] = res.slot_ids[tri_mat_idx[valid]]
                 tri_mat_key[~valid] = fallback_id
             else:
                 tri_mat_key.fill(fallback_id)
 
-        # ---- merge-children g ----
+        # ---- merge features ----
         generic_value01 = None
         if want_g:
             generic_value01 = np.full((num_loops,), float(contrib.generic_value01 or 0.0), dtype=np.float32)
