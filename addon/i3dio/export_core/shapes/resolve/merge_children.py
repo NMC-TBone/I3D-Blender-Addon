@@ -67,7 +67,7 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
 
         # Root becomes a Shape in Scene and points at shapeId
         node.kind = NodeKind.SHAPE
-        node.xml.node["shapeId"] = entry.id
+        node.shape_id = entry.id
 
         rep.debug("[%s] MergeChildren shapeId=%d contributors=%d", obj.name, entry.id, len(entry.contributors))
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
@@ -65,6 +66,33 @@ class SceneNode:
     i3d_mapping: bool = False
     i3d_mapping_name: str | None = None
 
+    @property
+    def shape_id(self) -> int | None:
+        sid = self.xml.node.get("shapeId")
+        return sid if isinstance(sid, int) else None
+
+    @shape_id.setter
+    def shape_id(self, value: int | None) -> None:
+        if value is None:
+            self.xml.node.pop("shapeId", None)
+        else:
+            self.xml.node["shapeId"] = int(value)
+
+    @property
+    def material_ids(self) -> str | None:
+        mids = self.xml.node.get("materialIds")
+        return mids if isinstance(mids, str) else None
+
+    @material_ids.setter
+    def material_ids(self, value: str | Iterable[int] | None) -> None:
+        if value is None:
+            self.xml.node.pop("materialIds", None)
+            return
+        if isinstance(value, str):
+            self.xml.node["materialIds"] = value
+            return
+        self.xml.node["materialIds"] = ",".join(str(int(mid)) for mid in value)
+
 
 @dataclass(slots=True)
 class IRIndex:
@@ -88,6 +116,14 @@ class ExportIR:
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     roots: list[int] = field(default_factory=list)
     index: IRIndex = field(default_factory=IRIndex)
+
+    def iter_nodes(self, *, kind: NodeKind | None = None, emitted_only: bool = False) -> Iterator[SceneNode]:
+        for node in self.scene_nodes.values():
+            if kind is not None and node.kind != kind:
+                continue
+            if emitted_only and not node.emit:
+                continue
+            yield node
 
     def add_node(self, node: SceneNode, *, parent_id: int | None = None) -> None:
         """Add a pre-created SceneNode into the IR and attach it."""

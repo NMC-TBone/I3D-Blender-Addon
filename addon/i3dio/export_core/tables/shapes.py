@@ -118,11 +118,11 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         self._entries[entry.id] = entry
 
     def link_node(self, node: SceneNode) -> None:
-        """Link a SceneNode to a ShapeEntry by setting node.xml.node["shapeId"]."""
+        """Link a SceneNode to a ShapeEntry by setting node.shape_id."""
         ref = node.blender_ref
         if node.kind != NodeKind.SHAPE or not node.emit:
             return
-        if "shapeId" in node.xml.node:
+        if node.shape_id is not None:
             return
         if not isinstance(ref, bpy.types.Object):
             node.kind = NodeKind.TRANSFORM_GROUP
@@ -131,7 +131,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         self.ctx.node_reporter(node, "shape").debug("Linking ShapeEntry to SceneNode")
 
         if isinstance(ref.data, bpy.types.Mesh):
-            node.xml.node["shapeId"] = self.get_or_add_mesh(ref)
+            node.shape_id = self.get_or_add_mesh(ref)
             return
 
         # future: Curve support

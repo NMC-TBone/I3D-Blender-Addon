@@ -7,12 +7,25 @@ from typing import TYPE_CHECKING
 import bpy
 
 from ...ir import NodeKind, SceneNode
-from ...ir_node_helpers import clear_shape_binding, set_material_ids, to_transform_group
+from ...ir_node_helpers import clear_shape_binding, to_transform_group
 from ..its import MaterialKeyKind
 from ..its.material_resolve import resolve_slots
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
+
+
+def _get_shape_id(node: SceneNode) -> int | None:
+    return node.shape_id
+
+
+def _index_emitted_shape_nodes_by_id(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
+    shape_nodes_by_id: dict[int, list[SceneNode]] = defaultdict(list)
+    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, emitted_only=True):
+        sid = _get_shape_id(node)
+        if sid is not None:
+            shape_nodes_by_id[sid].append(node)
+    return shape_nodes_by_id
 
 
 def resolve_shapes_build(ctx: "ExportContext") -> None:
@@ -26,14 +39,7 @@ def resolve_shapes_build(ctx: "ExportContext") -> None:
     rep = ctx.section("shapes")
 
     # Map shapeId -> [node]
-    shape_nodes_by_id: dict[int, list[SceneNode]] = defaultdict(list)
-
-    for node in ctx.ir.scene_nodes.values():
-        if node.kind != NodeKind.SHAPE or not node.emit:
-            continue
-        sid = node.xml.node.get("shapeId")
-        if isinstance(sid, int):
-            shape_nodes_by_id[sid].append(node)
+    shape_nodes_by_id = _index_emitted_shape_nodes_by_id(ctx)
 
     if not shape_nodes_by_id:
         rep.debug("No shape nodes with shapeId; skipping build")
@@ -59,7 +65,6 @@ def resolve_shapes_build(ctx: "ExportContext") -> None:
         )
 
 
-
 def finalize_shape_material_ids(ctx: "ExportContext") -> None:
     """Finalize materialIds for Scene nodes.
 
@@ -72,18 +77,12 @@ def finalize_shape_material_ids(ctx: "ExportContext") -> None:
     rep = ctx.section("shapes")
 
     # First: clear any stale shape bindings on non-shape nodes.
-    for node in ctx.ir.scene_nodes.values():
-        if node.kind != NodeKind.SHAPE or not node.emit:
+    for node in ctx.ir.iter_nodes(emitted_only=True):
+        if node.kind != NodeKind.SHAPE:
             clear_shape_binding(node)
 
     # Map shapeId -> [node]
-    shape_nodes_by_id: dict[int, list[SceneNode]] = defaultdict(list)
-    for node in ctx.ir.scene_nodes.values():
-        if node.kind != NodeKind.SHAPE or not node.emit:
-            continue
-        sid = node.xml.node.get("shapeId")
-        if isinstance(sid, int):
-            shape_nodes_by_id[sid].append(node)
+    shape_nodes_by_id = _index_emitted_shape_nodes_by_id(ctx)
 
     if not shape_nodes_by_id:
         rep.debug("No shape nodes with shapeId; skipping materialIds finalize")
@@ -94,13 +93,13 @@ def finalize_shape_material_ids(ctx: "ExportContext") -> None:
         built = ctx.shapes.get_built(shape_id)
         if built is None or not built.material_ids:
             for n in nodes:
-                n.xml.node.pop("materialIds", None)
+                n.material_ids = None
             continue
 
         if built.material_kind == MaterialKeyKind.MATERIAL_ID:
             # Merge shapes: subsets already keyed by resolved global material IDs.
             for n in nodes:
-                set_material_ids(n, built.material_ids)
+                n.material_ids = built.material_ids
                 wrote_nodes += 1
             continue
 
@@ -108,7 +107,7 @@ def finalize_shape_material_ids(ctx: "ExportContext") -> None:
         for n in nodes:
             ref = n.blender_ref
             if not isinstance(ref, bpy.types.Object) or not isinstance(ref.data, bpy.types.Mesh):
-                n.xml.node.pop("materialIds", None)
+                n.material_ids = None
                 continue
 
             slot_materials = (
@@ -125,7 +124,7 @@ def finalize_shape_material_ids(ctx: "ExportContext") -> None:
                 else:
                     out_ids.append(int(fallback_id))
 
-            set_material_ids(n, out_ids)
+            n.material_ids = out_ids
             wrote_nodes += 1
 
     rep.debug("Finalized materialIds for %d nodes", wrote_nodes)

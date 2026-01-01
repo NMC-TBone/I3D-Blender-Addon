@@ -48,5 +48,4 @@ def build_indices_and_subsets(
         material_ids.append(int(mat))
         write += n
 
-    # (Optional sanity) write should equal indices.size
     return indices, subsets, material_ids

@@ -66,7 +66,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
         # Mutate IR nodes
         root_node = ctx.ir.scene_nodes[root_node_id]
         root_node.kind = NodeKind.SHAPE
-        root_node.xml.node["shapeId"] = entry.id
+        root_node.shape_id = entry.id
         root_node.xml.node["skinBindNodeIds"] = " ".join(str(i) for i in bind_node_ids)
 
         for nid in ordered[1:]:
