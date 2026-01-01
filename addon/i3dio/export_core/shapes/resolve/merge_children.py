@@ -7,6 +7,8 @@ import bpy
 import mathutils
 
 from ...ir import NodeKind
+from ...shapes import ShapeMode
+from ...tables.shapes import ShapeVariant
 from .. import ShapeContributor
 
 if TYPE_CHECKING:
@@ -61,7 +63,13 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
             continue
 
         # Create synthetic merged shape entry
-        entry = ctx.shapes.add_merge_children(root_obj=obj)
+        entry = ctx.shapes.add_merge_shape(
+            root_obj=obj,
+            name=obj.name,
+            mode=ShapeMode.MERGE_CHILDREN_GENERIC,
+            variant=ShapeVariant.MERGE_CHILDREN,
+        )
+        entry.xml.children.setdefault("Vertices", {})["generic"] = True
         for mesh_obj, ref_frame, g in contributors:
             entry.contributors.append(ShapeContributor(mesh_obj, ref_frame, generic_value01=g))
 

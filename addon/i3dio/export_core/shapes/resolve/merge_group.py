@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 import bpy
 
 from ...ir import NodeKind
-from ...tables.shapes import ShapeContributor
+from ...shapes import ShapeMode
+from ...tables.shapes import ShapeContributor, ShapeVariant
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
@@ -53,7 +54,14 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
         ordered = list(dict.fromkeys([root_node_id, *node_ids]))
 
         # Create the merged ShapeEntry
-        entry = ctx.shapes.add_merge_group(root_obj=root_obj, mg_index=mg_index)
+        entry = ctx.shapes.add_merge_shape(
+            root_obj=root_obj,
+            name=f"mergeGroup_{mg_index}",
+            mode=ShapeMode.MERGE_GROUP,
+            variant=ShapeVariant.MERGE_GROUP,
+            merge_group_index=mg_index,
+        )
+        entry.xml.children.setdefault("Vertices", {})["singleblendweights"] = True
         root_frame = root_obj.matrix_world.copy()
 
         # Contributors + bind list (bind index == position in ordered list)

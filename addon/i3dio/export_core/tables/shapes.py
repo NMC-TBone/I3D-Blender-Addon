@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import TYPE_CHECKING, Literal
 
 import bpy
@@ -20,13 +21,24 @@ if TYPE_CHECKING:
 ShapeKind = Literal["IndexedTriangleSet", "NurbsCurve"]
 
 
+class ShapeVariant(StrEnum):
+    """Disambiguator for synthetic shapes that don't map 1:1 to a datablock."""
+
+    NORMAL = "NORMAL"
+    MERGE_CHILDREN = "MERGE_CHILDREN"
+    MERGE_GROUP = "MERGE_GROUP"
+
+
 @dataclass(frozen=True, slots=True)
 class ShapeKey:
     kind: ShapeKind
     data_ptr: int  # mesh/curve datablock pointer
     object_ptr: int  # object pointer (for modifier-applied shapes)
     apply_modifiers: bool
-    special: str | None = None  # None for "normal" meshes
+    # Only used as part of the table key (caching/dedup) so synthetic shapes
+    # (which often have data_ptr=0) don't collide with each other.
+    variant: ShapeVariant = ShapeVariant.NORMAL
+    merge_group_index: int | None = None
 
 
 @dataclass(slots=True)
@@ -79,7 +91,8 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
             data_ptr=mesh.as_pointer(),
             object_ptr=object_ptr,
             apply_modifiers=apply_modifiers,
-            special=None,
+            variant=ShapeVariant.NORMAL,
+            merge_group_index=None,
         )
         if (sid := self.get_id(key)) is not None:
             return sid
@@ -87,31 +100,25 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         entry.contributors.append(ShapeContributor(obj=obj, reference_frame=None))
         return entry.id
 
-    def add_merge_children(self, root_obj: bpy.types.Object) -> ShapeEntry:
+    def add_merge_shape(
+        self,
+        *,
+        root_obj: bpy.types.Object,
+        name: str,
+        mode: ShapeMode,
+        variant: ShapeVariant,
+        merge_group_index: int | None = None,
+    ) -> ShapeEntry:
         apply_modifiers = self.ctx.settings.get("apply_modifiers", True)
         key = ShapeKey(
             kind="IndexedTriangleSet",
             data_ptr=0,
             object_ptr=root_obj.as_pointer(),
             apply_modifiers=apply_modifiers,
-            special="MERGE_CHILDREN",
+            variant=variant,
+            merge_group_index=merge_group_index,
         )
-        entry = self._alloc_entry(key=key, name=root_obj.name, mode=ShapeMode.MERGE_CHILDREN_GENERIC)
-        entry.xml.children.setdefault("Vertices", {})["generic"] = True
-        return entry
-
-    def add_merge_group(self, *, root_obj: bpy.types.Object, mg_index: int) -> ShapeEntry:
-        apply_modifiers = self.ctx.settings.get("apply_modifiers", True)
-        key = ShapeKey(
-            kind="IndexedTriangleSet",
-            data_ptr=0,
-            object_ptr=root_obj.as_pointer(),
-            apply_modifiers=apply_modifiers,
-            special=f"MERGE_GROUP:{mg_index}",
-        )
-        entry = self._alloc_entry(key=key, name=f"mergeGroup_{mg_index}", mode=ShapeMode.MERGE_GROUP)
-        entry.xml.children.setdefault("Vertices", {})["singleblendweights"] = True
-        return entry
+        return self._alloc_entry(key=key, name=name, mode=mode)
 
     def register_entry(self, entry: ShapeEntry) -> None:
         self._by_key[entry.key] = entry.id
