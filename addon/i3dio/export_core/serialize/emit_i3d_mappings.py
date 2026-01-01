@@ -140,10 +140,10 @@ def emit_i3d_mappings(ctx: "ExportContext") -> None:
     mapped: list[tuple[str, str]] = []
     for nid in _iter_tree_preorder(ctx):
         node = ctx.ir.scene_nodes[nid]
-        if not node.attrs.get("i3d_mapping"):
+        if not node.i3d_mapping:
             continue
 
-        mapping_name = node.attrs.get("i3d_mapping_name") or node.id
+        mapping_name = node.i3d_mapping_name or node.id
         mapped.append((mapping_name, index_paths[nid]))
 
     if not mapped:

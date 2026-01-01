@@ -51,7 +51,7 @@ def resolve_all(ctx: "ExportContext") -> None:
 
     kinds = Counter(n.kind for n in ctx.ir.scene_nodes.values())
     emitted = sum(1 for n in ctx.ir.scene_nodes.values() if n.emit)
-    mapped = sum(1 for n in ctx.ir.scene_nodes.values() if n.attrs.get("i3d_mapping"))
+    mapped = sum(1 for n in ctx.ir.scene_nodes.values() if n.i3d_mapping)
 
     rep.debug(
         "Resolve summary: emitted=%d/%d mapped=%d kinds=%s",

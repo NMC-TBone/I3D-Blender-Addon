@@ -36,7 +36,7 @@ KIND_TO_TAG: dict[NodeKind, EmitTag] = {
 
 
 def node_emit_tag(node: "SceneNode") -> EmitTag:
-    return node.emit_as or KIND_TO_TAG.get(node.kind, EmitTag.TRANSFORM_GROUP)
+    return KIND_TO_TAG.get(node.kind, EmitTag.TRANSFORM_GROUP)
 
 
 @dataclass(slots=True)
@@ -58,11 +58,12 @@ class SceneNode:
     # Computed local transform in EXPORT space (ready for serializer)
     matrix_local_export: Matrix | None = None
     emit: bool = True  # whether to emit this node (e.g. armature can be collapsed)
-    emit_as: EmitTag | None = None
 
     xml: XmlBuckets = field(default_factory=XmlBuckets)
-    # generic "bag" for per-kind attributes/flags/anything
-    attrs: dict[str, Any] = field(default_factory=dict)
+
+    # i3dMappings export fields
+    i3d_mapping: bool = False
+    i3d_mapping_name: str | None = None
 
 
 @dataclass(slots=True)

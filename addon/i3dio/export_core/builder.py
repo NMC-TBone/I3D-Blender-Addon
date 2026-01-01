@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ..utility import BlenderObject
 from .ids import IdKind
@@ -19,8 +19,6 @@ class SceneBuilder:
         kind: NodeKind,
         blender_ref: BlenderObject,
         parent_id: int | None,
-        attrs: dict[str, Any] | None = None,
-        emit_as: EmitTag | None = None,
     ) -> int:
         """Create a SceneNode in IR and attach it into the tree."""
         node_id = self.ctx.ids.alloc(IdKind.NODE)
@@ -31,8 +29,6 @@ class SceneBuilder:
             blender_ref=blender_ref,
             parent_id=parent_id,
             matrix_local_export=None,
-            emit_as=emit_as,
-            attrs=attrs or {},
         )
         self.ctx.ir.add_node(node)
         return node_id

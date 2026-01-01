@@ -47,6 +47,11 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
     def emit_node(node_id: int, parent_elem) -> None:
         node = ctx.ir.scene_nodes[node_id]
 
+        if not node.emit:
+            for child_id in node.children:
+                emit_node(child_id, parent_elem)
+            return
+
         elem = xml_i3d.SubElement(parent_elem, node_emit_tag(node).value, {"name": node.name, "nodeId": str(node.id)})
         for k, v in node.xml.node.items():
             xml_i3d.write_attribute(elem, k, v)

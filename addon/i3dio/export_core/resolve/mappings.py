@@ -13,9 +13,9 @@ def finalize_i3d_mapping_for_node(ctx: "ExportContext", node: SceneNode) -> None
     """
     Tag nodes that should be included in i3dMappings export.
 
-    Stores:
-      node.attrs["i3d_mapping"] = True
-      node.attrs["i3d_mapping_name"] = "..." (optional)
+        Stores:
+            node.i3d_mapping = True
+            node.i3d_mapping_name = "..." (optional)
     """
     ref = node.blender_ref
     try:
@@ -28,7 +28,7 @@ def finalize_i3d_mapping_for_node(ctx: "ExportContext", node: SceneNode) -> None
         ctx.node_reporter(node, "i3dMappings").debug("Collapsed armature is not mapped")
         return  # collapsed armatures must not be mapped
 
-    node.attrs["i3d_mapping"] = True
+    node.i3d_mapping = True
     mapping_name = (mapping_pg.mapping_name or node.name).strip()
-    node.attrs["i3d_mapping_name"] = mapping_name
+    node.i3d_mapping_name = mapping_name
     ctx.node_reporter(node, "i3dMappings").debug("Marked for mapping (name=%r)", mapping_name)
