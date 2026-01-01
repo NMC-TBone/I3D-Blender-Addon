@@ -120,10 +120,6 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         )
         return self._alloc_entry(key=key, name=name, mode=mode)
 
-    def register_entry(self, entry: ShapeEntry) -> None:
-        self._by_key[entry.key] = entry.id
-        self._entries[entry.id] = entry
-
     def link_node(self, node: SceneNode) -> None:
         """Link a SceneNode to a ShapeEntry by setting node.shape_id."""
         ref = node.blender_ref
