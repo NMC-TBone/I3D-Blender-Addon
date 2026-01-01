@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
 def _node_world_blender(node: SceneNode) -> mathutils.Matrix | None:
     """World matrix in Blender space for this node, or None if node has no transform."""
-    if node.matrix_world_bl is not None:
-        return node.matrix_world_bl.copy()
-
     if isinstance(node.blender_ref, bpy.types.Object):
         return node.blender_ref.matrix_world.copy()
 
@@ -48,13 +45,7 @@ def _local_matrix_export(ctx: "ExportContext", node: SceneNode, parent: SceneNod
         # fast-path: only safe when both are real objects and exporter parent == Blender parent
         ref = node.blender_ref
         parent_ref = parent.blender_ref if parent else None
-        if (
-            isinstance(ref, bpy.types.Object)
-            and isinstance(parent_ref, bpy.types.Object)
-            and ref.parent is parent_ref
-            and node.matrix_world_bl is None
-            and parent.matrix_world_bl is None
-        ):
+        if isinstance(ref, bpy.types.Object) and isinstance(parent_ref, bpy.types.Object) and ref.parent is parent_ref:
             local_e = ctx.to_export(ref.matrix_local.copy())
         else:
             local_e = parent_world_e.inverted_safe() @ world_e

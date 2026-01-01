@@ -55,8 +55,6 @@ class SceneNode:
     blender_ref: Any | None
     parent_id: int | None = None
     children: list[int] = field(default_factory=list)
-    # Optional override in Blender space (used for instancing/baking/etc)
-    matrix_world_bl: Matrix | None = None
     # Computed local transform in EXPORT space (ready for serializer)
     matrix_local_export: Matrix | None = None
     emit: bool = True  # whether to emit this node (e.g. armature can be collapsed)

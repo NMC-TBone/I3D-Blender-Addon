@@ -30,7 +30,6 @@ class SceneBuilder:
             kind=kind,
             blender_ref=blender_ref,
             parent_id=parent_id,
-            matrix_world_bl=None,
             matrix_local_export=None,
             emit_as=emit_as,
             attrs=attrs or {},
