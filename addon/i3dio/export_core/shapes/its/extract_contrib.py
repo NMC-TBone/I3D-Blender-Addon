@@ -30,7 +30,6 @@ def extract_contrib_its(
         return None
 
     ev_obj, mesh = evaluated_mesh_for_export(ctx, obj, reference_frame=contrib.reference_frame)
-    warned: set[str] = set()
 
     try:
         num_loops = len(mesh.loops)
@@ -86,12 +85,11 @@ def extract_contrib_its(
                 idxs = np.unique(tri_mat_idx[valid])
                 empty_ref = any(slot_materials[int(i)] is None for i in idxs)
             oob_ref = not np.all(valid)
-            if (empty_ref or oob_ref) and obj.name not in warned:
+            if empty_ref or oob_ref:
                 ctx.section("materials").warning(
                     "[%s] Some triangles reference empty/out-of-bounds material slots; using fallback/default material",
                     obj.name,
                 )
-                warned.add(obj.name)
 
         if material_kind == MaterialKeyKind.SLOT_INDEX:
             # NORMAL shapes: keep slot indices; per-node materialIds mapping happens in assemble.
