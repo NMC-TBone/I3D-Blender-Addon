@@ -8,6 +8,7 @@ import bpy
 
 from ..ids import IdKind
 from ..ir import NodeKind, SceneNode, XmlBuckets
+from ..ir_node_helpers import to_transform_group
 from ..shapes import ShapeContributor, ShapeMode
 from ..shapes.its import BuiltITS
 from ..shapes.its.build import build_indexed_triangle_set
@@ -67,12 +68,16 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
     def get_or_add_mesh(self, obj: bpy.types.Object) -> int:
         apply_modifiers = self.ctx.settings.get("apply_modifiers", True)
         mesh = obj.data
-        assert isinstance(mesh, bpy.types.Mesh), "Expected a Mesh data-block"
+
+        # Modifiers live on the object. If we are applying modifiers, only shapes
+        # with enabled modifiers should be keyed per-object; modifier-free linked duplicates can safely share.
+        has_enabled_modifiers = any(m.show_viewport for m in obj.modifiers)
+        object_ptr = obj.as_pointer() if (apply_modifiers and has_enabled_modifiers) else 0
 
         key = ShapeKey(
             kind="IndexedTriangleSet",
             data_ptr=mesh.as_pointer(),
-            object_ptr=obj.as_pointer() if apply_modifiers else 0,
+            object_ptr=object_ptr,
             apply_modifiers=apply_modifiers,
             special=None,
         )
@@ -123,14 +128,14 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
             node.kind = NodeKind.TRANSFORM_GROUP
             return
 
+        self.ctx.node_reporter(node, "shape").debug("Linking ShapeEntry to SceneNode")
+
         if isinstance(ref.data, bpy.types.Mesh):
             node.xml.node["shapeId"] = self.get_or_add_mesh(ref)
             return
 
         # future: Curve support
-        node.kind = NodeKind.TRANSFORM_GROUP
-        node.xml.node.pop("shapeId", None)
-        node.xml.node.pop("materialIds", None)
+        to_transform_group(node)
 
     def iter_built(self):
         """Iterate over all built shapes (skipping None)."""

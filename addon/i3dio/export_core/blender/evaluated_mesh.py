@@ -25,12 +25,15 @@ def evaluated_mesh_for_export(
     """
     apply_modifiers = ctx.settings.get("apply_modifiers", True)
 
+    # Only use depsgraph evaluation when we explicitly want modifiers applied.
+    # When apply_modifiers is False, passing a depsgraph can still yield evaluated
+    # results depending on Blender version/context.
     if apply_modifiers:
         ev_obj = obj.evaluated_get(ctx.depsgraph)
+        mesh = ev_obj.to_mesh(preserve_all_data_layers=False, depsgraph=ctx.depsgraph)
     else:
         ev_obj = obj
-
-    mesh = ev_obj.to_mesh(preserve_all_data_layers=False, depsgraph=ctx.depsgraph)
+        mesh = ev_obj.to_mesh(preserve_all_data_layers=False)
 
     # Optional "reference frame" placement (used for merge features)
     if reference_frame is not None:

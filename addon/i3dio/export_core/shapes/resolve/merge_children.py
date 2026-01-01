@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Iterable
 import bpy
 import mathutils
 
+from ...ir import NodeKind
 from .. import ShapeContributor
 
 if TYPE_CHECKING:
@@ -65,6 +66,7 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
             entry.contributors.append(ShapeContributor(mesh_obj, ref_frame, generic_value01=g))
 
         # Root becomes a Shape in Scene and points at shapeId
+        node.kind = NodeKind.SHAPE
         node.xml.node["shapeId"] = entry.id
 
         rep.debug("[%s] MergeChildren shapeId=%d contributors=%d", obj.name, entry.id, len(entry.contributors))

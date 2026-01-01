@@ -21,25 +21,27 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
         return
 
     scene_groups = ctx.scene.i3dio_merge_groups
-    # helper: find node_id for a specific Blender object
+    # find node_id for a specific Blender object
     by_obj_ptr = {
-        getattr(n.blender_ref, "as_pointer", lambda: 0)(): nid
+        n.blender_ref.as_pointer(): nid
         for nid, n in ctx.ir.scene_nodes.items()
         if isinstance(n.blender_ref, bpy.types.Object)
     }
 
     for mg_index, node_ids in groups.items():
-        if mg_index < 0 or mg_index >= len(scene_groups):
+        if not (0 <= mg_index < len(scene_groups)):
             rep.warning("MergeGroup index %d out of range (have %d groups); skipping", mg_index, len(scene_groups))
             continue
 
         mg = scene_groups[mg_index]
-        root_obj = mg.root
-        if not isinstance(root_obj, bpy.types.Object):
+        root_obj: bpy.types.Object | None = mg.root
+        if not root_obj:
             rep.warning("MergeGroup %d has no root object; skipping", mg_index)
             continue
-        if root_obj.type != "MESH" or not isinstance(root_obj.data, bpy.types.Mesh):
-            rep.warning("MergeGroup %d root %r is not a Mesh; skipping", mg_index, root_obj.name)
+        if root_obj.type != "MESH":
+            rep.warning(
+                "MergeGroup %d root %r must be a Mesh object (got %s); skipping", mg_index, root_obj.name, root_obj.type
+            )
             continue
 
         root_node_id = by_obj_ptr.get(root_obj.as_pointer())
@@ -48,47 +50,29 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             continue
 
         # bind order: root first, then the rest in traversal order (dedup just in case)
-        seen: set[int] = set()
-        ordered = []
-        for nid in [root_node_id, *node_ids]:
-            if nid not in seen:
-                seen.add(nid)
-                ordered.append(nid)
+        ordered = list(dict.fromkeys([root_node_id, *node_ids]))
 
         # Create the merged ShapeEntry
         entry = ctx.shapes.add_merge_group(root_obj=root_obj, mg_index=mg_index)
         root_frame = root_obj.matrix_world.copy()
 
         # Contributors + bind list (bind index == position in ordered list)
-        bind_node_ids: list[int] = []
         for bind_index, nid in enumerate(ordered):
-            n = ctx.ir.scene_nodes[nid]
-            bind_node_ids.append(n.id)  # node.id == nodeId in scene
+            ref = ctx.ir.scene_nodes[nid].blender_ref
+            if isinstance(ref, bpy.types.Object) and ref.type == "MESH":
+                entry.contributors.append(ShapeContributor(obj=ref, reference_frame=root_frame, bind_index=bind_index))
 
-            ref = n.blender_ref
-            if isinstance(ref, bpy.types.Object) and ref.type == "MESH" and isinstance(ref.data, bpy.types.Mesh):
-                entry.contributors.append(
-                    ShapeContributor(
-                        obj=ref,
-                        reference_frame=root_frame,
-                        generic_value01=None,
-                        bind_index=bind_index,
-                    )
-                )
-
+        bind_node_ids = [ctx.ir.scene_nodes[nid].id for nid in ordered]
         # Mutate IR nodes
         root_node = ctx.ir.scene_nodes[root_node_id]
         root_node.kind = NodeKind.SHAPE
         root_node.xml.node["shapeId"] = entry.id
         root_node.xml.node["skinBindNodeIds"] = " ".join(str(i) for i in bind_node_ids)
 
-        for nid in ordered:
-            if nid == root_node_id:
-                continue
+        for nid in ordered[1:]:
+            # Member nodes become TransformGroups
             n = ctx.ir.scene_nodes[nid]
             n.kind = NodeKind.TRANSFORM_GROUP
-            n.xml.node.pop("shapeId", None)
-            n.xml.node.pop("materialIds", None)
             ctx.node_reporter(n, "merge_group").debug("Converted to TransformGroup (part of MergeGroup %d)", mg_index)
 
         rep.debug(

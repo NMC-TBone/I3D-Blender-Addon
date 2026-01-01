@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from . import BuiltITS, ItsContributorStream
+from .. import ShapeMode
+from . import BuiltITS, ItsContributorStream, MaterialKeyKind
 from .extract_contrib import extract_contrib_its
 from .subsets import build_indices_and_subsets
 
@@ -32,9 +33,13 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     want_g = vattrs.get("generic", False)
     want_bi = vattrs.get("singleblendweights", False)
 
+    # NORMAL shapes: subsets are keyed by material slot index and mapped to materialIds per Scene node.
+    # Merge shapes: subsets are keyed by resolved global material ID (contributors may have different slot layouts).
+    material_kind = MaterialKeyKind.SLOT_INDEX if entry.mode == ShapeMode.NORMAL else MaterialKeyKind.MATERIAL_ID
+
     contrib_streams: list[ItsContributorStream] = []
     for contrib in entry.contributors:
-        stream = extract_contrib_its(ctx, contrib, want_g=want_g, want_bi=want_bi)
+        stream = extract_contrib_its(ctx, contrib, want_g=want_g, want_bi=want_bi, material_kind=material_kind)
         if stream is not None:
             contrib_streams.append(stream)
     if not contrib_streams:
@@ -99,6 +104,7 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     return BuiltITS(
         name=entry.name,
         shape_id=entry.id,
+        material_kind=material_kind,
         positions=positions,
         normals=normals,
         indices=indices,

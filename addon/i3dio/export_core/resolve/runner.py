@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING
 
-from ..shapes.resolve.assemble import resolve_shapes_build
+from ..shapes.resolve.assemble import finalize_shape_material_ids, resolve_shapes_build
 from ..shapes.resolve.link import resolve_shape_links
 from ..shapes.resolve.merge_children import resolve_merge_children
 from ..shapes.resolve.merge_group import resolve_merge_groups
@@ -46,6 +46,7 @@ def resolve_all(ctx: "ExportContext") -> None:
     # resolve_instances(ctx)
 
     resolve_shapes_build(ctx)
+    finalize_shape_material_ids(ctx)
     resolve_matrices(ctx)
 
     kinds = Counter(n.kind for n in ctx.ir.scene_nodes.values())

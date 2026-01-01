@@ -8,8 +8,8 @@ import numpy as np
 
 from ...blender.evaluated_mesh import evaluated_mesh_for_export, free_evaluated_mesh
 from .. import ShapeContributor
-from . import ItsContributorStream
-from .material_resolve import choose_fallback_material_id, resolve_slots
+from . import ItsContributorStream, MaterialKeyKind
+from .material_resolve import resolve_slots
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
@@ -22,6 +22,8 @@ def extract_contrib_its(
     contrib: ShapeContributor,
     want_g: bool,
     want_bi: bool,
+    *,
+    material_kind: MaterialKeyKind = MaterialKeyKind.SLOT_INDEX,
 ) -> ItsContributorStream | None:
     obj = contrib.obj
     if not isinstance(obj, bpy.types.Object) or obj.type != "MESH":
@@ -65,36 +67,24 @@ def extract_contrib_its(
         mesh.loop_triangles.foreach_get("loops", tri_loops)
         tri_loops = tri_loops.reshape(num_triangles, 3)
 
-        # ---- polygon -> material index -> resolved materialId ----
+        # ---- polygon -> material key ----
         tri_poly = np.empty(num_triangles, dtype=np.int32)
         mesh.loop_triangles.foreach_get("polygon_index", tri_poly)
 
         poly_mat = np.empty(len(mesh.polygons), dtype=np.int32)
         mesh.polygons.foreach_get("material_index", poly_mat)
 
-        tri_mat_idx = poly_mat[tri_poly]  # (T,)
+        tri_mat_idx = poly_mat[tri_poly]  # (T,) slot indices from mesh
 
-        if ev_obj.material_slots:
-            slot_materials = [s.material for s in ev_obj.material_slots]
-        else:
-            slot_materials = list(mesh.materials)
+        slot_materials = [s.material for s in ev_obj.material_slots] if ev_obj.material_slots else list(mesh.materials)
 
-        tri_mat_id = np.empty(num_triangles, dtype=np.int32)
-        if not slot_materials:
-            fallback_id = choose_fallback_material_id(ctx, slot_materials=slot_materials)
-            # common for collisions etc: no warning, just default/fallback for all tris
-            tri_mat_id.fill(fallback_id if fallback_id is not None else ctx.materials.get_default_id())
-        else:
-            res = resolve_slots(ctx, slot_materials=slot_materials)
-
+        # Warn once per object if triangles reference empty/out-of-bounds slots.
+        if slot_materials:
             valid = (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
-            tri_mat_id[valid] = res.slot_ids[tri_mat_idx[valid]]
-
-            if not np.all(valid):
-                tri_mat_id[~valid] = res.fallback_id if res.fallback_id is not None else ctx.materials.get_default_id()
-
-            # warn once per object if any invalid
-            empty_ref = np.any(valid) and np.any(~res.slot_has_mat[tri_mat_idx[valid]])
+            empty_ref = False
+            if np.any(valid):
+                idxs = np.unique(tri_mat_idx[valid])
+                empty_ref = any(slot_materials[int(i)] is None for i in idxs)
             oob_ref = not np.all(valid)
             if (empty_ref or oob_ref) and obj.name not in warned:
                 ctx.section("materials").warning(
@@ -102,6 +92,28 @@ def extract_contrib_its(
                     obj.name,
                 )
                 warned.add(obj.name)
+
+        if material_kind == MaterialKeyKind.SLOT_INDEX:
+            # NORMAL shapes: keep slot indices; per-node materialIds mapping happens in assemble.
+            if not slot_materials:
+                # If no materials exist at all, keep a single subset (slot 0).
+                tri_mat_key = np.full((num_triangles,), 0, dtype=np.int32)
+            else:
+                tri_mat_key = tri_mat_idx
+        else:
+            # Merge shapes: resolve to global material IDs so multiple contributors
+            # with different slot layouts merge correctly.
+            res = resolve_slots(ctx, slot_materials=slot_materials)
+            default_id = ctx.materials.get_default_id()
+            fallback_id = res.fallback_id if res.fallback_id is not None else default_id
+
+            tri_mat_key = np.empty((num_triangles,), dtype=np.int32)
+            if slot_materials:
+                valid = (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
+                tri_mat_key[valid] = res.slot_ids[tri_mat_idx[valid]]
+                tri_mat_key[~valid] = fallback_id
+            else:
+                tri_mat_key.fill(fallback_id)
 
         # ---- merge-children g ----
         generic_value01 = None
@@ -119,7 +131,7 @@ def extract_contrib_its(
             normals=normals,
             uvs=uvs,
             tri_loops=tri_loops,
-            tri_mat_id=tri_mat_id,
+            tri_mat_id=tri_mat_key,
             generic_value01=generic_value01,
             bind_idx=bind_idx,
         )
