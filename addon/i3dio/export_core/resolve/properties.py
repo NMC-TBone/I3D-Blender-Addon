@@ -12,6 +12,7 @@ from ..ir import EmitTag, NodeKind, SceneNode, XmlBuckets, node_emit_tag
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
+    from ..tables.materials import MaterialEntry
 
 _EPS_FLOAT = 1e-6
 _EPS_VEC = 1e-6
@@ -69,6 +70,16 @@ def resolve_properties(ctx: "ExportContext", node: SceneNode) -> None:
 
     if node.kind == NodeKind.CAMERA and isinstance(data, bpy.types.Camera):
         _collect_camera_builtin(data, node.xml.node)
+
+
+def resolve_material_properties(ctx: "ExportContext", entry: "MaterialEntry") -> None:
+    mat = entry.blender_material
+    if mat is None or not isinstance(mat, bpy.types.Material):
+        return
+
+    pg_mat = getattr(mat, "i3d_attributes", None)
+    if pg_mat is not None:
+        _collect_pg(owner=mat, pg=pg_mat, out=entry.xml)
 
 
 def _collect_camera_builtin(cam: bpy.types.Camera, out: dict[str, Any]) -> None:

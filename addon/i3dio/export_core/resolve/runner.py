@@ -12,7 +12,7 @@ from .kinds import resolve_kind_for_node
 from .mappings import finalize_i3d_mapping_for_node
 from .matrices import resolve_matrices
 from .names import finalize_name_for_node
-from .properties import resolve_properties
+from .properties import resolve_material_properties, resolve_properties
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -47,6 +47,9 @@ def resolve_all(ctx: "ExportContext") -> None:
 
     resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx)
+
+    for m in ctx.materials.entries():
+        resolve_material_properties(ctx, m)
     resolve_matrices(ctx)
 
     kinds = Counter(n.kind for n in ctx.ir.scene_nodes.values())
