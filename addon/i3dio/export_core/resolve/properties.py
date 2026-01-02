@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import bpy
 
 from ... import utility
-from ..ir import EmitTag, NodeKind, SceneNode, XmlBuckets, node_emit_tag
+from ..ir import EmitAttrs, EmitTag, NodeKind, NodeReference, SceneNode, node_emit_tag
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 class TrackingSpec:
     member_path: str
     value_gate: Any | None
+    value_gate_set: bool  # must preserve '"value" in tracking' semantics
     mapping: dict[Any, Any] | None
 
 
@@ -31,7 +32,7 @@ class DependsSpec:
 @dataclass(frozen=True, slots=True)
 class PropSpec:
     key: str
-    placement: str  # "Node" or child tag
+    placement: str  # "Node" or child tag name or "IndexedTriangleSet", etc.
     name: str | None
     default: Any
     field_type: str | None
@@ -40,45 +41,104 @@ class PropSpec:
     tracking: TrackingSpec | None
 
 
-_SPECS_CACHE: dict[type, tuple[PropSpec, ...]] = {}
+@dataclass(frozen=True, slots=True)
+class SpecBundle:
+    export: tuple[PropSpec, ...]  # only props with placement != None
+    tracking_by_key: dict[str, TrackingSpec | None]  # all props (incl UI-only)
 
 
-class _SkipSentinel:
-    __slots__ = ()
+_BUNDLE_CACHE: dict[type, SpecBundle] = {}
+_SKIP = object()
 
 
-_SKIP = _SkipSentinel()
+# Compilation
+def _compile_bundle(pg: Any) -> SpecBundle:
+    cls = type(pg)
+    if (cached := _BUNDLE_CACHE.get(cls)) is not None:
+        return cached
+    i3d_map: dict[str, dict[str, Any]] = getattr(pg, "i3d_map", {})
+    annotations: dict[str, Any] = getattr(pg, "__annotations__", {})
+
+    def _parse_depends(info: dict[str, Any]) -> tuple[DependsSpec, ...]:
+        return tuple(DependsSpec(d["name"], d["value"]) for d in info.get("depends", []) or [])
+
+    def _parse_tracking(info: dict[str, Any]) -> TrackingSpec | None:
+        if not (tr := info.get("tracking")):
+            return None
+        return TrackingSpec(
+            member_path=tr["member_path"],
+            value_gate=tr.get("value"),
+            value_gate_set="value" in tr,
+            mapping=tr.get("mapping"),
+        )
+
+    tracking_by_key: dict[str, TrackingSpec | None] = {}
+    export_specs: list[PropSpec] = []
+
+    # iterate annotations to ensure only declared properties
+    for key in annotations.keys():
+        if not (info := i3d_map.get(key)):
+            continue
+        placement = info.get("placement", "Node")
+        tr = _parse_tracking(info)
+        tracking_by_key[key] = tr
+        if placement is None:
+            continue  # UI-only
+
+        export_specs.append(
+            PropSpec(
+                key=key,
+                placement=placement,
+                name=info.get("name"),
+                default=info.get("default"),
+                field_type=info.get("type"),
+                override=info.get("override"),
+                depends=_parse_depends(info),
+                tracking=tr,
+            )
+        )
+    bundle = SpecBundle(export=tuple(export_specs), tracking_by_key=tracking_by_key)
+    _BUNDLE_CACHE[cls] = bundle
+    return bundle
 
 
+# Public API (two entry points)
 def resolve_properties(ctx: "ExportContext", node: SceneNode) -> None:
     ref = node.blender_ref
     if not isinstance(ref, bpy.types.Object):
         return
-
-    pg_obj = getattr(ref, "i3d_attributes", None)
-    if pg_obj is not None:
-        _collect_pg(owner=ref, pg=pg_obj, out=node.xml)
+    _collect_i3d_attributes(ref, node.attrs)
 
     data = getattr(ref, "data", None)
-    pg_data = getattr(data, "i3d_attributes", None) if data is not None else None
-    if pg_data is not None and node_emit_tag(node) in {EmitTag.SHAPE, EmitTag.LIGHT}:
-        _collect_pg(owner=data, pg=pg_data, out=node.xml, ctx=ctx, scene_node=node)
+    if data is not None and node_emit_tag(node) in {EmitTag.SHAPE, EmitTag.LIGHT}:
+        _collect_i3d_attributes(data, node.attrs, ctx=ctx, scene_node=node)
     _resolve_reference_path(ctx, node)
 
     if node.kind == NodeKind.CAMERA and isinstance(data, bpy.types.Camera):
-        _collect_camera_builtin(data, node.xml.node)
+        _collect_camera_builtin(data, node.attrs.node)
 
 
 def resolve_material_properties(ctx: "ExportContext", entry: "MaterialEntry") -> None:
     mat = entry.blender_material
-    if mat is None or not isinstance(mat, bpy.types.Material):
+    if not isinstance(mat, bpy.types.Material):
         return
-
-    pg_mat = getattr(mat, "i3d_attributes", None)
-    if pg_mat is not None:
-        _collect_pg(owner=mat, pg=pg_mat, out=entry.xml)
+    _collect_i3d_attributes(mat, entry.attrs)
 
 
+# Small helper to avoid repeating pg lookups
+def _collect_i3d_attributes(
+    owner: Any,
+    out: EmitAttrs,
+    *,
+    ctx: "ExportContext" | None = None,
+    scene_node: "SceneNode" | None = None,
+) -> None:
+    pg = getattr(owner, "i3d_attributes", None)
+    if pg is not None:
+        _collect_pg(owner, pg, out, ctx=ctx, scene_node=scene_node)
+
+
+# Builtins / special cases
 def _collect_camera_builtin(cam: bpy.types.Camera, out: dict[str, Any]) -> None:
     out.setdefault("fov", cam.lens)
     out.setdefault("nearClip", cam.clip_start)
@@ -99,73 +159,42 @@ def _resolve_reference_path(ctx: "ExportContext", node: SceneNode) -> None:
     if not reference_path.lower().endswith(".i3d"):
         ctx.node_reporter(node, "properties").warning("Reference path does not end with '.i3d': %r", reference_path)
         return
-    node.xml.node["referenceId"] = ctx.files.add_reference(reference_path)
+
+    node.reference = NodeReference(id=ctx.files.add_reference(reference_path))
     if not ref.i3d_reference.runtime_loaded:
-        node.xml.node["referenceRuntimeLoaded"] = False  # default is True, only write when False
+        node.reference.runtime_loaded = False  # default is True, only write when False
 
     if child_path := ref.i3d_reference.child_path.strip():
-        node.xml.node["referenceChildPath"] = child_path
+        node.reference.child_path = child_path
 
 
-def _compile_specs(pg: Any) -> tuple[PropSpec, ...]:
-    cls = type(pg)
-    cached = _SPECS_CACHE.get(cls)
-    if cached is not None:
-        return cached
-
-    i3d_map: dict[str, dict[str, Any]] = getattr(pg, "i3d_map", {})
-    ann = getattr(pg, "__annotations__", {})
-
-    specs: list[PropSpec] = []
-    for key in ann.keys():
-        info = i3d_map.get(key)
-        if not info:
-            continue
-
-        placement = info.get("placement", "Node")
-        if placement is None:
-            continue  # UI-only
-
-        depends_info = info.get("depends", []) or []
-        depends = tuple(DependsSpec(d["name"], d["value"]) for d in depends_info)
-
-        tracking_info = info.get("tracking")
-        tracking = None
-        if tracking_info:
-            tracking = TrackingSpec(
-                member_path=tracking_info["member_path"],
-                value_gate=tracking_info.get("value"),
-                mapping=tracking_info.get("mapping"),
-            )
-
-        specs.append(
-            PropSpec(
-                key=key,
-                placement=placement,
-                name=info.get("name"),
-                default=info.get("default"),
-                field_type=info.get("type"),
-                override=info.get("override"),
-                depends=depends,
-                tracking=tracking,
-            )
-        )
-
-    out = tuple(specs)
-    _SPECS_CACHE[cls] = out
-    return out
-
-
+# Collection / routing
 def _collect_pg(
-    *, owner: Any, pg: Any, out: XmlBuckets, ctx: "ExportContext" = None, scene_node: "SceneNode" = None
+    owner: Any,
+    pg: Any,
+    out: EmitAttrs,
+    *,
+    ctx: "ExportContext" | None = None,
+    scene_node: "SceneNode" | None = None,
 ) -> None:
-    specs = _compile_specs(pg)
+    bundle = _compile_bundle(pg)
 
-    for spec in specs:
-        if not _deps_ok(owner=owner, pg=pg, spec=spec):
+    # Pre-compute the optional "shape definition sink" once
+    shape_sink: dict[str, Any] | None = None
+    if (
+        ctx is not None
+        and scene_node is not None
+        and scene_node.kind == NodeKind.SHAPE
+        and "IndexedTriangleSet" in {spec.placement for spec in bundle.export}
+        and (sid := scene_node.shape_id) is not None
+    ):
+        shape_sink = ctx.shapes.get_entry(sid).attrs.node
+
+    for spec in bundle.export:
+        if not _deps_ok(owner, pg, spec, bundle):
             continue
 
-        val = _effective_value(owner=owner, pg=pg, spec=spec)
+        val = _effective_value_key(owner=owner, pg=pg, key=spec.key, tr=spec.tracking)
         if val is _SKIP:
             continue
 
@@ -176,79 +205,55 @@ def _collect_pg(
         if value_to_write is _SKIP:
             continue
 
-        placement = spec.placement
-        # Normal case: attribute on current node/element
-        if placement == "Node":
-            out.node[i3d_name] = value_to_write
-            continue
-
-        # Special case: e.g. mesh datablock properties that target the SHAPE DEFINITION
-        if (
-            ctx is not None
-            and scene_node is not None
-            and scene_node.kind == NodeKind.SHAPE
-            and placement == "IndexedTriangleSet"
-            and (sid := scene_node.shape_id) is not None
-        ):
-            ctx.shapes.get_entry(sid).xml.node[i3d_name] = value_to_write
-            continue
-
-        # Default: treat placement as a child tag under the current node/element
-        out.children.setdefault(spec.placement, {})[i3d_name] = value_to_write
+        _write_prop(out, spec, i3d_name, value_to_write, shape_sink)
 
 
-def _deps_ok(*, owner: Any, pg: Any, spec: PropSpec) -> bool:
+def _write_prop(out: EmitAttrs, spec: PropSpec, name: str, value: Any, shape_sink: dict[str, Any] | None) -> None:
+    placement = spec.placement
+    if placement == "Node":
+        out.node[name] = value
+        return
+    if placement == "IndexedTriangleSet" and shape_sink is not None:
+        shape_sink[name] = value
+        return
+    # Default: treat placement as a child tag under the current node/element
+    out.child(placement)[name] = value
+
+
+# Depends / effective values
+def _deps_ok(owner: Any, pg: Any, spec: PropSpec, bundle: SpecBundle) -> bool:
     for dep in spec.depends:
-        dep_val = _effective_value_by_name(owner=owner, pg=pg, prop_name=dep.name)
+        dep_val = _effective_value_key(owner=owner, pg=pg, key=dep.name, tr=bundle.tracking_by_key.get(dep.name))
         if dep_val is _SKIP or dep_val != dep.value:
             return False
     return True
 
 
-def _effective_value_by_name(*, owner: Any, pg: Any, prop_name: str) -> Any:
-    # Uses the exact same semantics as your current effective_value() (including tracking if configured)
-    val = getattr(pg, prop_name, _SKIP)
+def _effective_value_key(*, owner: Any, pg: Any, key: str, tr: TrackingSpec | None) -> Any:
+    """
+    Unified value resolution used for:
+    - normal property export (PropSpec.key + PropSpec.tracking)
+    - dependency checks by name (DependsSpec.name + bundle.tracking_by_key)
+
+    Preserves semantics:
+    - missing pg prop -> _SKIP
+    - tracking enabled flag: f"{key}_tracking"
+    - 'value' gate checked by presence (value_gate_set), not by None-ness
+    """
+    val = getattr(pg, key, _SKIP)
     if val is _SKIP:
         return _SKIP
+    if not tr or not bool(getattr(pg, f"{key}_tracking", False)):
+        return val
+    raw = getattr(owner, tr.member_path, None)
+    if tr.value_gate_set and raw != tr.value_gate:
+        return _SKIP
 
-    i3d_map: dict[str, dict[str, Any]] = getattr(pg, "i3d_map", {})
-    info = i3d_map.get(prop_name, {})
-    tracking = info.get("tracking")
-
-    tracking_flag_name = f"{prop_name}_tracking"
-    tracking_enabled = bool(getattr(pg, tracking_flag_name, False))
-
-    if tracking_enabled and tracking:
-        if "value" in tracking and getattr(owner, tracking["member_path"], None) != tracking["value"]:
-            return _SKIP
-
-        raw = getattr(owner, tracking["member_path"])
-        mapping = tracking.get("mapping")
-        return mapping.get(raw, raw) if mapping else raw
-
-    return val
+    return tr.mapping.get(raw, raw) if tr.mapping else raw
 
 
-def _effective_value(*, owner: Any, pg: Any, spec: PropSpec) -> Any:
-    val = getattr(pg, spec.key)
-
-    tracking_flag_name = f"{spec.key}_tracking"
-    tracking_enabled = bool(getattr(pg, tracking_flag_name, False))
-
-    if tracking_enabled and spec.tracking is not None:
-        tr = spec.tracking
-        raw = getattr(owner, tr.member_path, None)
-
-        if tr.value_gate is not None and raw != tr.value_gate:
-            return _SKIP
-
-        return tr.mapping.get(raw, raw) if tr.mapping else raw
-
-    return val
-
-
+# Export conversions (as minimal as possible, serializer will handle rest)
 def _convert_for_export(val: Any, spec: PropSpec) -> tuple[str, Any]:
-    # Preserve your existing behavior exactly:
     # name=None => "enum-name-is-value" special case
     i3d_name = spec.name
     value_to_write: Any = val

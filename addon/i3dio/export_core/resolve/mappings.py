@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..ir import NodeKind, SceneNode
+from ..ir import SceneNode
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -17,17 +17,15 @@ def finalize_i3d_mapping_for_node(ctx: "ExportContext", node: SceneNode) -> None
             node.i3d_mapping = True
             node.i3d_mapping_name = "..." (optional)
     """
-    ref = node.blender_ref
+    if not node.emit:
+        ctx.node_reporter(node, "i3dMappings").debug("Skipping unmapped unemit node")
+        return  # e.g. collapsed armatures must not be mapped
     try:
-        mapping_pg = ref.i3d_mapping
+        mapping_pg = node.blender_ref.i3d_mapping
     except AttributeError:
         return
     if not mapping_pg.is_mapped:
         return
-    if node.kind == NodeKind.ARMATURE and ref.i3d_attributes.collapse_armature:
-        ctx.node_reporter(node, "i3dMappings").debug("Collapsed armature is not mapped")
-        return  # collapsed armatures must not be mapped
-
     node.i3d_mapping = True
     mapping_name = (mapping_pg.mapping_name or node.name).strip()
     node.i3d_mapping_name = mapping_name

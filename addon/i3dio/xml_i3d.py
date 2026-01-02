@@ -17,6 +17,7 @@ from typing import Any
 
 import bpy
 import mathutils
+import numpy as np
 from idprop.types import IDPropertyArray
 
 logger = logging.getLogger(__name__)
@@ -79,10 +80,22 @@ def fmt_attr_value(value: Any) -> str:
         return f"{value:d}"
     if isinstance(value, float):
         return f"{value:.6g}"
+    # numpy scalar numbers (np.int64, np.float32, etc.)
+    if isinstance(value, np.integer):
+        return f"{int(value):d}"
+    if isinstance(value, np.floating):
+        return f"{float(value):.6g}"
     if isinstance(value, str):
         return value
 
     # Vector-ish
+    if isinstance(value, np.ndarray):
+        # Treat 1D arrays as vectors; higher dims fall back to str().
+        if value.ndim == 0:
+            return fmt_attr_value(value.item())
+        if value.ndim == 1:
+            return _fmt_vector(tuple(float(x) for x in value))
+
     if isinstance(value, (list, tuple, bpy.types.bpy_prop_array, mathutils.Color, mathutils.Vector, IDPropertyArray)):
         return _fmt_vector(tuple(value))
 
@@ -97,26 +110,6 @@ def escape_attr(text: str) -> str:
 
 def write_attribute(element: XML_Element, attribute: str, value: Any) -> None:
     element.set(attribute, fmt_attr_value(value))
-
-
-def write_int(element: XML_Element, attribute: str, value: int) -> None:
-    element.set(attribute, f"{value:d}")
-
-
-def write_float(element: XML_Element, attribute: str, value: float) -> None:
-    element.set(attribute, f"{value:.6g}")
-
-
-def write_bool(element: XML_Element, attribute: str, value: bool) -> None:
-    element.set(attribute, str(value).lower())
-
-
-def write_string(element: XML_Element, attribute: str, value: str) -> None:
-    element.set(attribute, value)
-
-
-def write_vector(element: XML_Element, attribute: str, values: tuple) -> None:
-    element.set(attribute, _fmt_vector(tuple(values)))
 
 
 # Pretty indentation
@@ -159,12 +152,16 @@ def write_tree_to_file(
     tree.write(file_path, *argv, **kwargs)
 
 
-def _xml_write_open_tag(f, tag: str, attrib: dict[str, Any], indent: str = "") -> None:
+def write_open_tag(f, tag: str, attrib: dict[str, Any], indent: str = "") -> None:
     if attrib:
         parts = [f'{k}="{escape_attr(fmt_attr_value(v))}"' for k, v in attrib.items()]
         f.write(f"{indent}<{tag} " + " ".join(parts) + ">\n")
     else:
         f.write(f"{indent}<{tag}>\n")
+
+
+def write_close_tag(f, tag: str, indent: str = "") -> None:
+    f.write(f"{indent}</{tag}>\n")
 
 
 def export_to_i3d_file(
@@ -196,7 +193,7 @@ def export_to_i3d_file(
             f.write(f'<?xml version="1.0" encoding="{encoding}"?>\n')
 
         # <i3D ...>
-        _xml_write_open_tag(f, root.tag, root.attrib, indent="")
+        write_open_tag(f, root.tag, root.attrib, indent="")
 
         # Children in order; stream Shapes
         for child in list(root):
@@ -211,7 +208,7 @@ def export_to_i3d_file(
             for line in xml.splitlines(True):
                 f.write(("  " + line) if line.strip() else line)
 
-        f.write(f"</{root.tag}>\n")
+        write_close_tag(f, root.tag, indent="")
 
 
 # Attribute escaping monkeypatch (i3d-specific)

@@ -5,7 +5,7 @@ from enum import Enum
 
 import numpy as np
 
-from ..ir import XmlBuckets
+from ..ir import EmitAttrs
 
 
 class MaterialKeyKind(str, Enum):
@@ -55,7 +55,7 @@ class BuiltITS:
     g: np.ndarray | None = None
     bi: np.ndarray | None = None
 
-    xml: XmlBuckets = field(default_factory=XmlBuckets)
+    attrs: EmitAttrs = field(default_factory=EmitAttrs)
 
     @property
     def vertex_count(self) -> int:

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Literal
 
-from ..ir import XmlBuckets
+from ..ir import EmitAttrs
 
 if TYPE_CHECKING:
     from ..shapes import ShapeContributor, ShapeMode
@@ -43,4 +43,4 @@ class ShapeEntry:
     name: str
     mode: "ShapeMode"
     contributors: list["ShapeContributor"] = field(default_factory=list)
-    xml: XmlBuckets = field(default_factory=XmlBuckets)
+    attrs: EmitAttrs = field(default_factory=EmitAttrs)

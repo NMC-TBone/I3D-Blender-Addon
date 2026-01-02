@@ -29,7 +29,7 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     if not entry.contributors:
         return None  # No contributors
 
-    vattrs = entry.xml.children.get("Vertices", {})
+    vattrs = entry.attrs.children.get("Vertices", {})
     want_g = vattrs.get("generic", False)
     want_bi = vattrs.get("singleblendweights", False)
 
@@ -125,5 +125,5 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
         uvs=uvs_out,
         g=g_out,
         bi=bi_out,
-        xml=entry.xml,
+        attrs=entry.attrs,
     )

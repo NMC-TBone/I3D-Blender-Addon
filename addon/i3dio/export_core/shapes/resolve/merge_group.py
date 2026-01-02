@@ -62,7 +62,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             variant=ShapeVariant.MERGE_GROUP,
             merge_group_index=mg_index,
         )
-        entry.xml.children.setdefault("Vertices", {})["singleblendweights"] = True
+        entry.attrs.child("Vertices")["singleblendweights"] = True
         root_frame = root_obj.matrix_world.copy()
 
         # Contributors + bind list (bind index == position in ordered list)
@@ -76,7 +76,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
         root_node = ctx.ir.scene_nodes[root_node_id]
         root_node.kind = NodeKind.SHAPE
         root_node.shape_id = entry.id
-        root_node.xml.node["skinBindNodeIds"] = " ".join(str(i) for i in bind_node_ids)
+        root_node.skin_bind_node_ids = bind_node_ids
 
         for nid in ordered[1:]:
             # Member nodes become TransformGroups

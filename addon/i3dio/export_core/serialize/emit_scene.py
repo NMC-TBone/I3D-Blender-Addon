@@ -9,6 +9,7 @@ import mathutils
 from ... import xml_i3d
 from ...utility import isclose_any
 from ..ir import SceneNode, node_emit_tag
+from .xml_attrs import write_child_elements, write_node_attributes
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -27,13 +28,13 @@ def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
     t = matrix_local_export.to_translation()
     if not isclose_any(t, _ZERO3):
         t_scaled = (t.x * ctx.unit_scale, t.y * ctx.unit_scale, t.z * ctx.unit_scale)
-        xml_i3d.write_attribute(elem, "translation", "{0:.6g} {1:.6g} {2:.6g}".format(*t_scaled))
+        xml_i3d.write_attribute(elem, "translation", t_scaled)
 
     # Rotation (degrees)
     r = matrix_local_export.to_euler("XYZ")
     if not isclose_any(r, _ZERO_EULER_XYZ):
         r_deg = (math.degrees(r.x), math.degrees(r.y), math.degrees(r.z))
-        xml_i3d.write_attribute(elem, "rotation", "{0:.6g} {1:.6g} {2:.6g}".format(*r_deg))
+        xml_i3d.write_attribute(elem, "rotation", r_deg)
 
     # Scale
     if matrix_local_export.is_negative:
@@ -44,7 +45,7 @@ def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
 
     s = matrix_local_export.to_scale()
     if not isclose_any(s, _ONE3):
-        xml_i3d.write_attribute(elem, "scale", "{0:.6g} {1:.6g} {2:.6g}".format(*s))
+        xml_i3d.write_attribute(elem, "scale", (s.x, s.y, s.z))
 
 
 def emit_scene(ctx: ExportContext, scene_elem) -> None:
@@ -57,15 +58,14 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
             return
 
         elem = xml_i3d.SubElement(parent_elem, node_emit_tag(node).value, {"name": node.name, "nodeId": str(node.id)})
-        for k, v in node.xml.node.items():
-            ctx.node_reporter(node).debug(f"SceneNode attribute: {k}={v}")
-            xml_i3d.write_attribute(elem, k, v)
-
-        for child_name, child_attrs in node.xml.children.items():
-            child_elem = xml_i3d.SubElement(elem, child_name)
-            for k, v in child_attrs.items():
-                ctx.node_reporter(node).debug(f"SceneNode child attribute: {child_name} {k}={v}")
-                xml_i3d.write_attribute(child_elem, k, v)
+        write_node_attributes(
+            elem=elem,
+            emit_attrs=node.attrs,
+            material_ids=node.material_ids,
+            skin_bind_node_ids=node.skin_bind_node_ids,
+            reference=node.reference,
+        )
+        write_child_elements(parent_elem=elem, emit_attrs=node.attrs)
 
         _write_transform(ctx, elem, node)
 

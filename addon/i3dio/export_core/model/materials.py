@@ -5,7 +5,7 @@ from typing import Any
 
 import bpy
 
-from ..ir import XmlBuckets
+from ..ir import EmitAttrs
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,12 +19,12 @@ class MaterialEntry:
     id: int
     key: MaterialKey
     blender_material: bpy.types.Material | None
-    xml: XmlBuckets = field(default_factory=XmlBuckets)
+    attrs: EmitAttrs = field(default_factory=EmitAttrs)
     extra_children: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
     def has_normalmap(self) -> bool:
         """Return True if this material has a Normalmap child element queued for export."""
-        return "Normalmap" in self.xml.children
+        return "Normalmap" in self.attrs.children
 
     def get_slot_name(self) -> str | None:
         """Return the optional materialSlotName (or None if disabled)."""

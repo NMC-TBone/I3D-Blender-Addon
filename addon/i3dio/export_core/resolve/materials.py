@@ -32,10 +32,12 @@ def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> No
 
     def _set_color(xml_key: str, socket_name: str, fallback) -> None:
         col = _linked_rgb_color(_socket(socket_name)) or fallback
-        entry.xml.node.setdefault(xml_key, list(col)[:3])
+        entry.attrs.node.setdefault(xml_key, list(col)[:3])
 
     def _set_tex(tag: str, path: str) -> dict:
-        return entry.xml.children.setdefault(tag, {"fileId": ctx.files.add_image(path)})
+        attrs = entry.attrs.child(tag)
+        attrs.setdefault("fileId", ctx.files.add_image(path))
+        return attrs
 
     def _tex_path(tex) -> str | None:
         return _image_path(tex)
@@ -67,7 +69,7 @@ def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> No
     if (p := _find_glossmap_path(mat, principled)) is not None:
         _set_tex("Glossmap", p)
     elif not vehicle_shader:
-        entry.xml.node.setdefault(
+        entry.attrs.node.setdefault(
             "specularColor", [1.0 - float(principled.roughness), float(principled.specular), float(principled.metallic)]
         )
 
@@ -79,22 +81,20 @@ def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> No
             "Normalmap": "$data/shared/default_normal.dds",
         }
         for tag, path in defaults.items():
-            if tag not in entry.xml.children:
+            if tag not in entry.attrs.children:
                 _set_tex(tag, path)
 
     # Custom shader + variation + params/textures (from Material.i3d_attributes)
     if shader_name and shader_name != SHADER_DEFAULT:
         if shader_data := get_shader_dict(i3d_attrs.use_custom_shaders).get(shader_name):
             shader_file_id = ctx.files.add_shader(str(shader_data.path))
-            entry.xml.node["customShaderId"] = shader_file_id
+            entry.attrs.node["customShaderId"] = shader_file_id
 
             if shader_name == "mirrorShader":
-                entry.xml.children.setdefault("Reflectionmap", {}).update(
-                    {"type": "planar", "refractiveIndex": 10, "bumpScale": 0.1}
-                )
+                entry.attrs.child("Reflectionmap").update({"type": "planar", "refractiveIndex": 10, "bumpScale": 0.1})
 
         if (variation := i3d_attrs.shader_variation_name) != SHADER_DEFAULT:
-            entry.xml.node["customShaderVariation"] = variation
+            entry.attrs.node["customShaderVariation"] = variation
 
         _emit_custom_parameters(entry, i3d_attrs.shader_material_params)
         _emit_custom_textures(ctx, entry, i3d_attrs.shader_material_textures)

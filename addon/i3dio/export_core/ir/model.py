@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
@@ -41,9 +41,19 @@ def node_emit_tag(node: "SceneNode") -> EmitTag:
 
 
 @dataclass(slots=True)
-class XmlBuckets:
+class EmitAttrs:
     node: dict[str, Any] = field(default_factory=dict)  # attributes for the node itself (e.g. <IndexedTriangleSet>)
     children: dict[str, dict[str, Any]] = field(default_factory=dict)  # child_name -> attrs (e.g. <Vertices>)
+
+    def child(self, tag: str) -> dict[str, Any]:
+        return self.children.setdefault(tag, {})
+
+
+@dataclass(slots=True)
+class NodeReference:
+    id: int | None = None
+    child_path: str | None = None
+    runtime_loaded: bool | None = None
 
 
 @dataclass(slots=True)
@@ -60,7 +70,19 @@ class SceneNode:
     matrix_local_export: Matrix | None = None
     emit: bool = True  # whether to emit this node (e.g. armature can be collapsed)
 
-    xml: XmlBuckets = field(default_factory=XmlBuckets)
+    attrs: EmitAttrs = field(default_factory=EmitAttrs)
+
+    # For Shapes in the Scene graph, resolved global export material IDs in subset order.
+    # Formatting into the I3D "materialIds" attribute is handled by the serializer.
+    material_ids: list[int] | None = None
+
+    # For merge groups / skinned meshes: node ids (not shape ids) that provide skin bind transforms.
+    # Formatting into the I3D "skinBindNodeIds" attribute is handled by the serializer.
+    skin_bind_node_ids: list[int] | None = None
+
+    # Optional reference info for TransformGroups.
+    # Formatting into I3D reference attributes is handled by the serializer.
+    reference: "NodeReference" | None = None
 
     # i3dMappings export fields
     i3d_mapping: bool = False
@@ -68,30 +90,15 @@ class SceneNode:
 
     @property
     def shape_id(self) -> int | None:
-        sid = self.xml.node.get("shapeId")
+        sid = self.attrs.node.get("shapeId")
         return sid if isinstance(sid, int) else None
 
     @shape_id.setter
     def shape_id(self, value: int | None) -> None:
         if value is None:
-            self.xml.node.pop("shapeId", None)
+            self.attrs.node.pop("shapeId", None)
         else:
-            self.xml.node["shapeId"] = int(value)
-
-    @property
-    def material_ids(self) -> str | None:
-        mids = self.xml.node.get("materialIds")
-        return mids if isinstance(mids, str) else None
-
-    @material_ids.setter
-    def material_ids(self, value: str | Iterable[int] | None) -> None:
-        if value is None:
-            self.xml.node.pop("materialIds", None)
-            return
-        if isinstance(value, str):
-            self.xml.node["materialIds"] = value
-            return
-        self.xml.node["materialIds"] = ",".join(str(int(mid)) for mid in value)
+            self.attrs.node["shapeId"] = int(value)
 
 
 @dataclass(slots=True)
