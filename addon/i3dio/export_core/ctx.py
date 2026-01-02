@@ -9,14 +9,13 @@ import bpy
 import mathutils
 
 from .. import debugging
-from .builder import SceneBuilder
 from .ids import IdAllocator
-from .ir import ExportIR, SceneNode
+from .ir import ExportIR, SceneBuilder, SceneNode
 from .messages import ExportMessages
+from .registries.files import FileTable
+from .registries.materials import MaterialTable
+from .registries.shapes import ShapeTable
 from .reporting import Reporter
-from .tables.files import FileTable
-from .tables.materials import MaterialTable
-from .tables.shapes import ShapeTable
 
 
 @dataclass(slots=True)

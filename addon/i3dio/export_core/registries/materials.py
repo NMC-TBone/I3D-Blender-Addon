@@ -1,34 +1,19 @@
-# i3dio/export_core/tables/materials.py
+# i3dio/export_core/registries/materials.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import bpy
 
 from ..ids import IdKind
-from ..ir import XmlBuckets
+from ..model.materials import MaterialEntry, MaterialKey
 from .base import IdEntryTable
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
 
 DEFAULT_MATERIAL_NAME = "i3d_default_material"
-
-
-@dataclass(frozen=True, slots=True)
-class MaterialKey:
-    material_ptr: int  # 0 for None/export side only
-    export_name: str  # final Material@name (slot override or datablock name)
-
-
-@dataclass(slots=True)
-class MaterialEntry:
-    id: int
-    key: MaterialKey
-    blender_material: bpy.types.Material | None
-    xml: XmlBuckets = field(default_factory=XmlBuckets)
-    extra_children: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
 
 @dataclass(slots=True)

@@ -1,4 +1,3 @@
-# i3dio/export_core/shapes/its/model.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,20 +5,21 @@ from enum import Enum
 
 import numpy as np
 
-from ...ir import XmlBuckets
+from ..ir import XmlBuckets
 
 
 class MaterialKeyKind(str, Enum):
-        """How triangles/subsets are grouped by material.
+    """How triangles/subsets are grouped by material.
 
-        - SLOT_INDEX: subset keys are material slot indices from Blender meshes
-            (materialIds resolved per Scene node instance).
-        - MATERIAL_ID: subset keys are resolved global export material IDs
-            (used for merge modes where contributors may have different slot layouts).
-        """
+    - SLOT_INDEX: subset keys are material slot indices from Blender meshes
+        (materialIds resolved per Scene node instance).
+    - MATERIAL_ID: subset keys are resolved global export material IDs
+        (used for merge modes where contributors may have different slot layouts).
+    """
 
-        SLOT_INDEX = "slot_index"
-        MATERIAL_ID = "material_id"
+    SLOT_INDEX = "slot_index"
+    MATERIAL_ID = "material_id"
+
 
 Vec3f = np.ndarray  # (N,3) float32
 Vec2f = np.ndarray  # (N,2) float32
@@ -33,6 +33,7 @@ class BuiltSubset:
     first_vertex: int
     num_vertices: int
     material_id: int  # material key (see BuiltITS.material_kind)
+    material_slot_name: str | None = None  # optional Subset@materialSlotName
 
 
 @dataclass(slots=True)

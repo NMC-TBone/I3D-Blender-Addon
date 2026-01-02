@@ -1,54 +1,21 @@
-# i3dio/export_core/tables/shapes.py
+# i3dio/export_core/registries/shapes.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import bpy
 
 from ..ids import IdKind
-from ..ir import NodeKind, SceneNode, XmlBuckets
-from ..ir_node_helpers import to_transform_group
+from ..ir import NodeKind, SceneNode, to_transform_group
+from ..model.its import BuiltITS
+from ..model.shapes import ShapeEntry, ShapeKey, ShapeVariant
 from ..shapes import ShapeContributor, ShapeMode
-from ..shapes.its import BuiltITS
 from ..shapes.its.build import build_indexed_triangle_set
 from .base import IdEntryTable
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
-
-ShapeKind = Literal["IndexedTriangleSet", "NurbsCurve"]
-
-
-class ShapeVariant(StrEnum):
-    """Disambiguator for synthetic shapes that don't map 1:1 to a datablock."""
-
-    NORMAL = "NORMAL"
-    MERGE_CHILDREN = "MERGE_CHILDREN"
-    MERGE_GROUP = "MERGE_GROUP"
-
-
-@dataclass(frozen=True, slots=True)
-class ShapeKey:
-    kind: ShapeKind
-    data_ptr: int  # mesh/curve datablock pointer
-    object_ptr: int  # object pointer (for modifier-applied shapes)
-    apply_modifiers: bool
-    # Only used as part of the table key (caching/dedup) so synthetic shapes
-    # (which often have data_ptr=0) don't collide with each other.
-    variant: ShapeVariant = ShapeVariant.NORMAL
-    merge_group_index: int | None = None
-
-
-@dataclass(slots=True)
-class ShapeEntry:
-    id: int
-    key: ShapeKey
-    name: str
-    mode: ShapeMode
-    contributors: list[ShapeContributor] = field(default_factory=list)
-    xml: XmlBuckets = field(default_factory=XmlBuckets)
 
 
 @dataclass(slots=True)
@@ -92,7 +59,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
             object_ptr=object_ptr,
             apply_modifiers=apply_modifiers,
             variant=ShapeVariant.NORMAL,
-            merge_group_index=None,
+            slot_name_signature=_slot_name_signature(obj),
         )
         if (sid := self.get_id(key)) is not None:
             return sid
@@ -145,3 +112,14 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         for sid in sorted(self.built_by_id):
             if (built := self.built_by_id[sid]) is not None:
                 yield built
+
+
+def _material_slot_name(mat: bpy.types.Material | None) -> str | None:
+    if mat is None or not mat.i3d_attributes.use_material_slot_name:
+        return None
+    return mat.i3d_attributes.material_slot_name or mat.name
+
+
+def _slot_name_signature(obj: bpy.types.Object) -> tuple[str | None, ...]:
+    # canonical per-slot view; includes None slots
+    return tuple(_material_slot_name(ms.material) for ms in obj.material_slots)

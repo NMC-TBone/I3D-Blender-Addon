@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING
 import bpy
 
 from ...ir import NodeKind
+from ...model.shapes import ShapeVariant
 from ...shapes import ShapeMode
-from ...tables.shapes import ShapeContributor, ShapeVariant
+from .. import ShapeContributor
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext

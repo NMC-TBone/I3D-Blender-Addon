@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ..utility import BlenderObject
-from .ids import IdKind
-from .ir import EmitTag, NodeKind, SceneNode
+from ...utility import BlenderObject
+from ..ids import IdKind
+from .model import NodeKind, SceneNode
 
 if TYPE_CHECKING:
-    from .ctx import ExportContext
+    from ..ctx import ExportContext
 
 
 @dataclass(slots=True)

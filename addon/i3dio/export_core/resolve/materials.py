@@ -12,7 +12,7 @@ from ...ui.shader_picker import SHADER_DEFAULT
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
-    from ..tables.materials import MaterialEntry
+    from ..model.materials import MaterialEntry
 
 
 def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> None:
@@ -103,10 +103,7 @@ def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> No
 def _emit_custom_parameters(entry: "MaterialEntry", params) -> None:
     for name, value in params.items():
         default_value = params.id_properties_ui(name).as_dict().get("default")
-        print(f"Checking parameter: {name} = {value} (default: {default_value})")
-        print(f"Type of value: {type(value)}, Type of default: {type(default_value)}")
         if not utility.isclose_any(value, default_value):
-            print(f"Adding custom parameter: {name} = {value} (default: {default_value})")
             entry.extra_children.append(("CustomParameter", {"name": name, "value": value}))
 
 

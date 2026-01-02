@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 
 import bpy
 
-from ...ir import NodeKind, SceneNode
-from ...ir_node_helpers import clear_shape_binding, to_transform_group
+from ...ir import NodeKind, SceneNode, clear_shape_binding, to_transform_group
 from ..its import MaterialKeyKind
 from ..its.material_resolve import resolve_slots
 

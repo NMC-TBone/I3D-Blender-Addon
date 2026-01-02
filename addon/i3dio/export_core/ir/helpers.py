@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .ir import NodeKind, SceneNode
+from .model import NodeKind, SceneNode
 
 
 def clear_shape_binding(node: SceneNode) -> None:

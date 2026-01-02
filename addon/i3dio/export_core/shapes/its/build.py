@@ -12,7 +12,7 @@ from .subsets import build_indices_and_subsets
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
-    from ...tables.shapes import ShapeEntry
+    from ...model.shapes import ShapeEntry
 
 
 def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> BuiltITS | None:
@@ -100,6 +100,18 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     indices, subsets, material_ids = build_indices_and_subsets(tri_loops_all, tri_mat_id_all, total_loops)
     if indices.size == 0 or (indices.size % 3) != 0:
         return None
+
+    if material_kind == MaterialKeyKind.MATERIAL_ID:
+        for subset in subsets:
+            try:
+                subset.material_slot_name = ctx.materials.get_entry(subset.material_id).get_slot_name()
+            except KeyError:
+                subset.material_slot_name = None
+    else:
+        signature = entry.key.slot_name_signature or ()
+        for subset in subsets:
+            i = subset.material_id
+            subset.material_slot_name = signature[i] if 0 <= i < len(signature) else None
 
     return BuiltITS(
         name=entry.name,

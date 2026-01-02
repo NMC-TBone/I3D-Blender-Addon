@@ -1,4 +1,4 @@
-from .model import BuiltITS, BuiltSubset, ItsContributorStream, MaterialKeyKind
+from ...model.its import BuiltITS, BuiltSubset, ItsContributorStream, MaterialKeyKind
 
 __all__ = [
     "BuiltITS",

@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+import bpy
+
+from ..ir import XmlBuckets
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialKey:
+    material_ptr: int  # 0 for None/export side only
+    export_name: str  # final Material@name (slot override or datablock name)
+
+
+@dataclass(slots=True)
+class MaterialEntry:
+    id: int
+    key: MaterialKey
+    blender_material: bpy.types.Material | None
+    xml: XmlBuckets = field(default_factory=XmlBuckets)
+    extra_children: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
+
+    def has_normalmap(self) -> bool:
+        """Return True if this material has a Normalmap child element queued for export."""
+        return "Normalmap" in self.xml.children
+
+    def get_slot_name(self) -> str | None:
+        """Return the optional materialSlotName (or None if disabled)."""
+        mat = self.blender_material
+        if mat is None or not isinstance(mat, bpy.types.Material):
+            return None
+        if mat.i3d_attributes.use_material_slot_name:
+            return mat.i3d_attributes.material_slot_name or mat.name
+        return None

@@ -8,7 +8,7 @@ import mathutils
 
 from ...ir import NodeKind
 from ...shapes import ShapeMode
-from ...tables.shapes import ShapeVariant
+from ...model.shapes import ShapeVariant
 from .. import ShapeContributor
 
 if TYPE_CHECKING:

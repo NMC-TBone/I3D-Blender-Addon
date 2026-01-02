@@ -63,12 +63,3 @@ def resolve_kind_for_node(ctx: ExportContext, node: SceneNode) -> None:
 
     if obj_type not in _OBJECT_TYPE_TO_KIND:
         ctx.node_reporter(node, "kinds").debug("Unknown object type %r -> TRANSFORM_GROUP", obj_type)
-
-    # Pass 2 (future): special cases that override basic kind
-    # Examples from old exporter:
-    # - MERGE_CHILDREN / MERGE_GROUPS (mesh feature flags)
-    # - SKINNED_MESHES (mesh with armature modifier + exported armature)
-    #
-    # Keep this function small by delegating:
-    #   resolve_mesh_features(ctx)
-    #   resolve_skinned_meshes(ctx)

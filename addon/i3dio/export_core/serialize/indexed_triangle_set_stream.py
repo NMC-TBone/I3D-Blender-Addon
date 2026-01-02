@@ -89,10 +89,14 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     # <Subsets ...>
     _open_tag(f, indent + "  ", "Subsets", {"count": len(built.subsets)})
     for s in built.subsets:
+        slot_attr = ""
+        if s.material_slot_name is not None:
+            escaped = xml_i3d.escape_attr(xml_i3d.fmt_attr_value(s.material_slot_name))
+            slot_attr = f' materialSlotName="{escaped}"'
         f.write(
             f'{indent}    <Subset firstIndex="{s.first_index:d}" '
             f'numVertices="{s.num_vertices:d}" firstVertex="{s.first_vertex:d}" '
-            f'numIndices="{s.num_indices:d}" />\n'
+            f'numIndices="{s.num_indices:d}"{slot_attr} />\n'
         )
     _close_tag(f, indent + "  ", "Subsets")
     # </IndexedTriangleSet>

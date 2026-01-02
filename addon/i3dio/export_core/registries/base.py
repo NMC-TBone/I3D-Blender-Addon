@@ -1,4 +1,4 @@
-# i3dio/export_core/tables/base.py
+# i3dio/export_core/registries/base.py
 from __future__ import annotations
 
 from typing import Generic, TypeVar

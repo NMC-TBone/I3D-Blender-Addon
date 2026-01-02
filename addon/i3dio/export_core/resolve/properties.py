@@ -12,7 +12,7 @@ from ..ir import EmitTag, NodeKind, SceneNode, XmlBuckets, node_emit_tag
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
-    from ..tables.materials import MaterialEntry
+    from ..model.materials import MaterialEntry
 
 
 @dataclass(frozen=True, slots=True)

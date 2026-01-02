@@ -1,4 +1,4 @@
-# i3dio/export_core/tables/files.py
+# i3dio/export_core/registries/files.py
 from __future__ import annotations
 
 import shutil

@@ -4,16 +4,19 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING
 
-from ..shapes.resolve.assemble import finalize_shape_material_ids, resolve_shapes_build
-from ..shapes.resolve.link import resolve_shape_links
-from ..shapes.resolve.merge_children import resolve_merge_children
-from ..shapes.resolve.merge_group import resolve_merge_groups
 from .kinds import resolve_kind_for_node
 from .mappings import finalize_i3d_mapping_for_node
 from .materials import resolve_material_shading
 from .matrices import resolve_matrices
 from .names import finalize_name_for_node
 from .properties import resolve_material_properties, resolve_properties
+from .shapes import (
+    finalize_shape_material_ids,
+    resolve_merge_children,
+    resolve_merge_groups,
+    resolve_shape_links,
+    resolve_shapes_build,
+)
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -44,7 +47,6 @@ def resolve_all(ctx: "ExportContext") -> None:
     # resolve/fixups (future)
     # resolve_constraints(ctx)
     # resolve_armatures(ctx)
-    # resolve_instances(ctx)
 
     resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx)
