@@ -10,6 +10,7 @@ from ..shapes.resolve.merge_children import resolve_merge_children
 from ..shapes.resolve.merge_group import resolve_merge_groups
 from .kinds import resolve_kind_for_node
 from .mappings import finalize_i3d_mapping_for_node
+from .materials import resolve_material_shading
 from .matrices import resolve_matrices
 from .names import finalize_name_for_node
 from .properties import resolve_material_properties, resolve_properties
@@ -50,6 +51,7 @@ def resolve_all(ctx: "ExportContext") -> None:
 
     for m in ctx.materials.entries():
         resolve_material_properties(ctx, m)
+        resolve_material_shading(ctx, m)
     resolve_matrices(ctx)
 
     kinds = Counter(n.kind for n in ctx.ir.scene_nodes.values())

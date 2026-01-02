@@ -7,40 +7,44 @@ from typing import TYPE_CHECKING
 import mathutils
 
 from ... import xml_i3d
-from ...utility import near_one3, near_zero_euler, near_zero_vec
-from ..ir import node_emit_tag
+from ...utility import isclose_any
+from ..ir import SceneNode, node_emit_tag
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
 
+_ZERO3 = mathutils.Vector((0.0, 0.0, 0.0))
+_ONE3 = mathutils.Vector((1.0, 1.0, 1.0))
+_ZERO_EULER_XYZ = mathutils.Euler((0.0, 0.0, 0.0), "XYZ")
 
-def _write_transform(ctx: ExportContext, elem, local_export: mathutils.Matrix | None) -> None:
-    """local_export is expected to already be in EXPORT space."""
-    if local_export is None:
+
+def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
+    """Writes node.matrix_local_export (already in EXPORT space) into XML attributes."""
+    matrix_local_export = node.matrix_local_export
+    if matrix_local_export is None:
         return
-
-    m = local_export
-
     # Translation (scaled)
-    t = m.to_translation()
-    if not near_zero_vec(t):
+    t = matrix_local_export.to_translation()
+    if not isclose_any(t, _ZERO3):
         t_scaled = (t.x * ctx.unit_scale, t.y * ctx.unit_scale, t.z * ctx.unit_scale)
         xml_i3d.write_attribute(elem, "translation", "{0:.6g} {1:.6g} {2:.6g}".format(*t_scaled))
 
     # Rotation (degrees)
-    r = m.to_euler("XYZ")
-    if not near_zero_euler(r):
+    r = matrix_local_export.to_euler("XYZ")
+    if not isclose_any(r, _ZERO_EULER_XYZ):
         r_deg = (math.degrees(r.x), math.degrees(r.y), math.degrees(r.z))
         xml_i3d.write_attribute(elem, "rotation", "{0:.6g} {1:.6g} {2:.6g}".format(*r_deg))
 
     # Scale
-    if m.is_negative:
-        # optional: ctx.messages.warning(...) later
+    if matrix_local_export.is_negative:
+        ctx.node_reporter(node).warning(
+            "Negative scale detected (not supported by GIANTS Engine); scale will be omitted (defaults to 1 1 1)."
+        )
         return
 
-    s = m.to_scale()
-    if not near_one3(s):
-        xml_i3d.write_attribute(elem, "scale", "{0:.6g} {1:.6g} {2:.6g}".format(s.x, s.y, s.z))
+    s = matrix_local_export.to_scale()
+    if not isclose_any(s, _ONE3):
+        xml_i3d.write_attribute(elem, "scale", "{0:.6g} {1:.6g} {2:.6g}".format(*s))
 
 
 def emit_scene(ctx: ExportContext, scene_elem) -> None:
@@ -54,9 +58,16 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
 
         elem = xml_i3d.SubElement(parent_elem, node_emit_tag(node).value, {"name": node.name, "nodeId": str(node.id)})
         for k, v in node.xml.node.items():
+            ctx.node_reporter(node).debug(f"SceneNode attribute: {k}={v}")
             xml_i3d.write_attribute(elem, k, v)
 
-        _write_transform(ctx, elem, node.matrix_local_export)
+        for child_name, child_attrs in node.xml.children.items():
+            child_elem = xml_i3d.SubElement(elem, child_name)
+            for k, v in child_attrs.items():
+                ctx.node_reporter(node).debug(f"SceneNode child attribute: {child_name} {k}={v}")
+                xml_i3d.write_attribute(child_elem, k, v)
+
+        _write_transform(ctx, elem, node)
 
         for child_id in node.children:
             emit_node(child_id, elem)

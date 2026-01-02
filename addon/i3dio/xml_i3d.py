@@ -17,6 +17,7 @@ from typing import Any
 
 import bpy
 import mathutils
+from idprop.types import IDPropertyArray
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ def fmt_attr_value(value: Any) -> str:
         return value
 
     # Vector-ish
-    if isinstance(value, (list, tuple, bpy.types.bpy_prop_array, mathutils.Color, mathutils.Vector)):
+    if isinstance(value, (list, tuple, bpy.types.bpy_prop_array, mathutils.Color, mathutils.Vector, IDPropertyArray)):
         return _fmt_vector(tuple(value))
 
     # Fallback

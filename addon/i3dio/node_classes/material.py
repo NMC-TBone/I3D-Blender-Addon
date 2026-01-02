@@ -1,12 +1,12 @@
-import math
 from typing import ClassVar
+
 import bpy
-import mathutils
 from bpy_extras.node_shader_utils import PrincipledBSDFWrapper, ShaderImageTextureWrapper
+
 from .. import utility, xml_i3d
 from ..i3d import I3D
-from ..ui.shader_picker import SHADER_DEFAULT
 from ..ui.shader_parser import get_shader_dict
+from ..ui.shader_picker import SHADER_DEFAULT
 from .node import Node
 
 
@@ -128,11 +128,11 @@ class Material(Node):
                 value = self.i3d_attrs.shader_material_params[pname]
                 default = self.i3d_attrs.shader_material_params.id_properties_ui(pname).as_dict().get("default")
                 if len(value) == 1:
-                    if not math.isclose(value[0], default[0], abs_tol=1e-7):
+                    if not utility.isclose_number(value[0], default[0], abs_tol=1e-6):
                         parameter_dict["value"] = f"{value[0]:.6g}"
                         xml_i3d.SubElement(self.element, "CustomParameter", parameter_dict)
                 else:
-                    if not utility.vector_compare(mathutils.Vector(value), mathutils.Vector(default)):
+                    if not utility.isclose_sequence(value, default, abs_tol=1e-6):
                         parameter_dict["value"] = " ".join(f"{v:.6g}" for v in value)
                         xml_i3d.SubElement(self.element, "CustomParameter", parameter_dict)
 

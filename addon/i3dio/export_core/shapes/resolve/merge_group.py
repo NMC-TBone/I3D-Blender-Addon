@@ -56,7 +56,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
         # Create the merged ShapeEntry
         entry = ctx.shapes.add_merge_shape(
             root_obj=root_obj,
-            name=f"mergeGroup_{mg_index}",
+            name=mg.name or f"MergeGroup_{mg_index}",
             mode=ShapeMode.MERGE_GROUP,
             variant=ShapeVariant.MERGE_GROUP,
             merge_group_index=mg_index,

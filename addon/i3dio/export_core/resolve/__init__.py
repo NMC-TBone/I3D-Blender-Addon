@@ -2,7 +2,7 @@ _needs_reload = "bpy" in locals()
 
 import bpy
 
-from . import kinds, mappings, names, runner
+from . import kinds, mappings, materials, names, runner
 
 if _needs_reload:
     import importlib
@@ -10,6 +10,7 @@ if _needs_reload:
     kinds = importlib.reload(kinds)
     names = importlib.reload(names)
     mappings = importlib.reload(mappings)
+    materials = importlib.reload(materials)
     runner = importlib.reload(runner)
     print("i3dio export_core.resolve reloaded")
 

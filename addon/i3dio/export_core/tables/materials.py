@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import bpy
 
@@ -28,6 +28,7 @@ class MaterialEntry:
     key: MaterialKey
     blender_material: bpy.types.Material | None
     xml: XmlBuckets = field(default_factory=XmlBuckets)
+    extra_children: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
 
 @dataclass(slots=True)

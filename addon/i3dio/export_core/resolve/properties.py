@@ -6,16 +6,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import bpy
-import mathutils
 
+from ... import utility
 from ..ir import EmitTag, NodeKind, SceneNode, XmlBuckets, node_emit_tag
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
     from ..tables.materials import MaterialEntry
-
-_EPS_FLOAT = 1e-6
-_EPS_VEC = 1e-6
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +62,7 @@ def resolve_properties(ctx: "ExportContext", node: SceneNode) -> None:
     data = getattr(ref, "data", None)
     pg_data = getattr(data, "i3d_attributes", None) if data is not None else None
     if pg_data is not None and node_emit_tag(node) in {EmitTag.SHAPE, EmitTag.LIGHT}:
-        _collect_pg(owner=data, pg=pg_data, out=node.xml)
+        _collect_pg(owner=data, pg=pg_data, out=node.xml, ctx=ctx, scene_node=node)
     _resolve_reference_path(ctx, node)
 
     if node.kind == NodeKind.CAMERA and isinstance(data, bpy.types.Camera):
@@ -159,7 +156,9 @@ def _compile_specs(pg: Any) -> tuple[PropSpec, ...]:
     return out
 
 
-def _collect_pg(*, owner: Any, pg: Any, out: XmlBuckets) -> None:
+def _collect_pg(
+    *, owner: Any, pg: Any, out: XmlBuckets, ctx: "ExportContext" = None, scene_node: "SceneNode" = None
+) -> None:
     specs = _compile_specs(pg)
 
     for spec in specs:
@@ -170,17 +169,32 @@ def _collect_pg(*, owner: Any, pg: Any, out: XmlBuckets) -> None:
         if val is _SKIP:
             continue
 
-        if _is_default(val, spec.default):
+        if utility.isclose_any(val, spec.default):
             continue
 
         i3d_name, value_to_write = _convert_for_export(val, spec)
         if value_to_write is _SKIP:
             continue
 
-        if spec.placement == "Node":
+        placement = spec.placement
+        # Normal case: attribute on current node/element
+        if placement == "Node":
             out.node[i3d_name] = value_to_write
-        else:
-            out.children.setdefault(spec.placement, {})[i3d_name] = value_to_write
+            continue
+
+        # Special case: e.g. mesh datablock properties that target the SHAPE DEFINITION
+        if (
+            ctx is not None
+            and scene_node is not None
+            and scene_node.kind == NodeKind.SHAPE
+            and placement == "IndexedTriangleSet"
+            and (sid := scene_node.shape_id) is not None
+        ):
+            ctx.shapes.get_entry(sid).xml.node[i3d_name] = value_to_write
+            continue
+
+        # Default: treat placement as a child tag under the current node/element
+        out.children.setdefault(spec.placement, {})[i3d_name] = value_to_write
 
 
 def _deps_ok(*, owner: Any, pg: Any, spec: PropSpec) -> bool:
@@ -283,17 +297,3 @@ def _hex_to_prefixed_str(val: object) -> str | None:
         return None
 
     return f"0x{n:x}"
-
-
-def _is_default(val: Any, default: Any) -> bool:
-    if isinstance(val, float) and isinstance(default, (float, int)):
-        return math.isclose(val, float(default), abs_tol=_EPS_FLOAT)
-
-    if isinstance(val, (tuple, list, mathutils.Color)) or isinstance(val, bpy.types.bpy_prop_array):
-        v = tuple(val)
-        d = tuple(default) if isinstance(default, (tuple, list)) else default
-        if not isinstance(d, (tuple, list)) or len(v) != len(d):
-            return False
-        return all(math.isclose(float(a), float(b), abs_tol=_EPS_VEC) for a, b in zip(v, d))
-
-    return val == default

@@ -10,56 +10,70 @@ from pathlib import Path
 
 import bpy
 import mathutils
+from idprop.types import IDPropertyArray
 
 logger = logging.getLogger(__name__)
 
 BlenderObject = bpy.types.Object | bpy.types.Collection
 
-_ONE3 = mathutils.Vector((1.0, 1.0, 1.0))
+
+def _is_number(x: object) -> bool:
+    return isinstance(x, (int, float))
 
 
-def near_zero_vec(v: mathutils.Vector, eps: float = 1e-6) -> bool:
-    return v.length_squared <= eps * eps
+def _is_sequence_like(value: object) -> bool:
+    return isinstance(
+        value, (tuple, list, mathutils.Vector, mathutils.Color, bpy.types.bpy_prop_array, IDPropertyArray)
+    )
 
 
-def near_one3(v: mathutils.Vector, eps: float = 1e-6) -> bool:
-    return near_vec(v, _ONE3, eps)
-
-
-def near_vec(a: mathutils.Vector, b: mathutils.Vector, eps: float = 1e-6) -> bool:
-    d = a - b
-    return d.length_squared <= eps * eps
-
-
-def near_zero_euler(e: mathutils.Euler, eps: float = 1e-6) -> bool:
-    return max(abs(e.x), abs(e.y), abs(e.z)) <= eps
-
-
-def vector_compare(a: mathutils.Vector, b: mathutils.Vector, epsilon: float = 0.0000001) -> bool:
-    """Compares two vectors elementwise, to see if they are equal
-
-    The function will run through the elements of vector a and compare them with vector b elementwise. If the function
-    reaches a set of values not within epsilon, it will return immediately.
-
-    Args:
-        a: The first vector
-        b: The second vector
-        epsilon: The absolute tolerance to which the elements should be within
-
-    Returns:
-        True if the vectors are elementwise equal to the precision of epsilon
-
-    Raises:
-        TypeError: If the vectors aren't vectors with equal length
+def isclose_any(a: object, b: object, *, abs_tol: float = 1e-6) -> bool:
+    """Type-aware closeness check:
+    - numbers: abs-only
+    - Vectors/Colors/prop arrays: L2 norm
+    - Euler: max-abs per component
+    - other sequences: elementwise abs-only
+    - fallback: ==
     """
-    if len(a) != len(b) or not isinstance(a, mathutils.Vector) or not isinstance(b, mathutils.Vector):
-        raise TypeError("Both arguments must be vectors of equal length!")
+    # Numbers
+    if _is_number(a) and _is_number(b):
+        return math.isclose(float(a), float(b), rel_tol=0.0, abs_tol=abs_tol)
 
-    for idx in range(0, len(a)):
-        if not math.isclose(a[idx], b[idx], abs_tol=epsilon):
+    # Euler
+    if isinstance(a, mathutils.Euler) and isinstance(b, mathutils.Euler):
+        return max(abs(a.x - b.x), abs(a.y - b.y), abs(a.z - b.z)) <= abs_tol
+
+    if isinstance(a, mathutils.Vector) and isinstance(b, mathutils.Vector):
+        d = a - b
+        return d.length_squared <= abs_tol * abs_tol
+
+    # Vector-ish (Vector, Color, bpy_prop_array, tuples/lists that can become Vector)
+    if _is_sequence_like(a) and _is_sequence_like(b):
+        a_list = list(a)
+        b_list = list(b)
+
+        if len(a_list) != len(b_list):
             return False
 
-    return True
+        # If all numeric, prefer norm-based (same semantics as near_vec/near_zero_vec)
+        if all(_is_number(x) for x in a_list) and all(_is_number(y) for y in b_list):
+            # L2 norm (works for 2/3/4D too)
+            dsq = 0.0
+            for x, y in zip(a_list, b_list):
+                d = float(x) - float(y)
+                dsq += d * d
+            return dsq <= abs_tol * abs_tol
+
+        # Otherwise elementwise with abs-only for numeric parts, == for others
+        for x, y in zip(a_list, b_list):
+            if _is_number(x) and _is_number(y):
+                if not math.isclose(float(x), float(y), rel_tol=0.0, abs_tol=abs_tol):
+                    return False
+            else:
+                if x != y:
+                    return False
+        return True
+    return a == b
 
 
 def ext_user_dir(subpath: str = "", create: bool = True) -> Path:
