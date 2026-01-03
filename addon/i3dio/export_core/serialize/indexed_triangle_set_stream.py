@@ -8,7 +8,7 @@ from ... import xml_i3d
 if TYPE_CHECKING:
     from ..shapes.its import BuiltITS
 
-CHUNK_LINES = 50_000  # number of lines to buffer before writing to file
+CHUNK_LINES = 30_000  # number of lines to buffer before writing to file, more or less a random guess
 
 
 def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
@@ -27,12 +27,7 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     write_close = xml_i3d.write_close_tag
     escape_attr = xml_i3d.escape_attr
 
-    # Fast vector formatters for numpy rows (no Python loops)
-    def vec3(row) -> str:
-        return f"{row[0]:.6g} {row[1]:.6g} {row[2]:.6g}"
-
-    def vec2(row) -> str:
-        return f"{row[0]:.6g} {row[1]:.6g}"
+    write = f.write
 
     ind_tag = indent
     ind_child = indent + "  "  # 2 spaces deeper (matches your open-tag usage)
@@ -51,33 +46,49 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
 
     # vertices: chunked writing
     chunk: list[str] = []
+    append = chunk.append
     uv_layers = uvs  # local alias
     uv_count = len(uv_layers)
+
+    # Noticably faster than using for loop range over uv_count on a dense mesh
+    uv0 = uv_layers[0] if uv_count > 0 else None
+    uv1 = uv_layers[1] if uv_count > 1 else None
+    uv2 = uv_layers[2] if uv_count > 2 else None
+    uv3 = uv_layers[3] if uv_count > 3 else None
 
     for i in range(vcount):
         p = positions[i]
         n = normals[i]
 
-        # Build the line with a tiny list (few parts), then join once.
-        parts = [f'{ind_line}<v p="{vec3(p)}" n="{vec3(n)}"']
-        for li in range(uv_count):
-            uv = uv_layers[li][i]
-            parts.append(f' t{li}="{vec2(uv)}"')
+        # Build with in-line formatting, faster than calling any external function
+        line = f'{ind_line}<v p="{p[0]:.6g} {p[1]:.6g} {p[2]:.6g}" n="{n[0]:.6g} {n[1]:.6g} {n[2]:.6g}"'
+        if uv0 is not None:
+            uv = uv0[i]
+            line += f' t0="{uv[0]:.6g} {uv[1]:.6g}"'
+        if uv1 is not None:
+            uv = uv1[i]
+            line += f' t1="{uv[0]:.6g} {uv[1]:.6g}"'
+        if uv2 is not None:
+            uv = uv2[i]
+            line += f' t2="{uv[0]:.6g} {uv[1]:.6g}"'
+        if uv3 is not None:
+            uv = uv3[i]
+            line += f' t3="{uv[0]:.6g} {uv[1]:.6g}"'
         if g is not None:
-            gi = g[i]
-            parts.append(f' g="{gi:.9g}"')
+            line += f' g="{g[i]:.9g}"'
         elif bi is not None:
-            parts.append(f' bi="{bi[i]:d}"')
+            line += f' bi="{bi[i]:d}"'
 
-        parts.append(" />\n")
-        chunk.append("".join(parts))
+        line += " />\n"
+        append(line)
 
         if len(chunk) >= CHUNK_LINES:
-            f.write("".join(chunk))
+            write("".join(chunk))
             chunk.clear()
 
     if chunk:
-        f.write("".join(chunk))
+        write("".join(chunk))
+        chunk.clear()
 
     write_close(f, "Vertices", indent=ind_child)
 
@@ -86,19 +97,18 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
 
     # Avoid reshape + row iteration + int() calls
     flat = indices.ravel()
-    chunk.clear()
     for j in range(0, flat.size, 3):
         a = flat[j]
         b = flat[j + 1]
         c = flat[j + 2]
-        chunk.append(f'{ind_line}<t vi="{a} {b} {c}" />\n')
+        append(f'{ind_line}<t vi="{a} {b} {c}" />\n')
         if len(chunk) >= CHUNK_LINES:
-            f.write("".join(chunk))
+            write("".join(chunk))
             chunk.clear()
 
     if chunk:
-        f.write("".join(chunk))
-
+        write("".join(chunk))
+        chunk.clear()
     write_close(f, "Triangles", indent=ind_child)
 
     # <Subsets ...>
@@ -107,7 +117,7 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
         slot_attr = (
             f' materialSlotName="{escape_attr(s.material_slot_name)}"' if s.material_slot_name is not None else ""
         )
-        f.write(
+        write(
             f'{ind_line}<Subset firstIndex="{s.first_index:d}" '
             f'numVertices="{s.num_vertices:d}" firstVertex="{s.first_vertex:d}" '
             f'numIndices="{s.num_indices:d}"{slot_attr} />\n'
