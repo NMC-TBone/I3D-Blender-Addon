@@ -22,62 +22,96 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     vcount = int(positions.shape[0])
     tri_count = int(indices.shape[0] // 3)
 
+    # Localize lookups (can be a bit faster)
+    write_open = xml_i3d.write_open_tag
+    write_close = xml_i3d.write_close_tag
+    escape_attr = xml_i3d.escape_attr
+
+    # Fast vector formatters for numpy rows (no Python loops)
+    def vec3(row) -> str:
+        return f"{row[0]:.6g} {row[1]:.6g} {row[2]:.6g}"
+
+    def vec2(row) -> str:
+        return f"{row[0]:.6g} {row[1]:.6g}"
+
+    ind_tag = indent
+    ind_child = indent + "  "  # 2 spaces deeper (matches your open-tag usage)
+    ind_line = indent + "    "  # lines under Vertices/Triangles
+
     # <IndexedTriangleSet ...>
     its_attrs: dict[str, object] = {"name": built.name, "shapeId": built.shape_id, **built.attrs.node}
-    xml_i3d.write_open_tag(f, "IndexedTriangleSet", its_attrs, indent=indent)
+    write_open(f, "IndexedTriangleSet", its_attrs, indent=ind_tag)
 
     # <Vertices ...>
     v_attrs: dict[str, object] = {"count": vcount, "normal": True}
     for li in range(len(uvs)):
         v_attrs[f"uv{li}"] = True
     v_attrs.update(built.attrs.children.get("Vertices", {}))
-    xml_i3d.write_open_tag(f, "Vertices", v_attrs, indent=indent + "  ")
+    write_open(f, "Vertices", v_attrs, indent=ind_child)
 
     # vertices: chunked writing
     chunk: list[str] = []
+    uv_layers = uvs  # local alias
+    uv_count = len(uv_layers)
+
     for i in range(vcount):
-        line = [f'{indent}    <v p="{xml_i3d.fmt_attr_value(positions[i])}" n="{xml_i3d.fmt_attr_value(normals[i])}"']
-        for li, layer in enumerate(uvs):
-            line.append(f' t{li}="{xml_i3d.fmt_attr_value(layer[i])}"')
+        p = positions[i]
+        n = normals[i]
+
+        # Build the line with a tiny list (few parts), then join once.
+        parts = [f'{ind_line}<v p="{vec3(p)}" n="{vec3(n)}"']
+        for li in range(uv_count):
+            uv = uv_layers[li][i]
+            parts.append(f' t{li}="{vec2(uv)}"')
         if g is not None:
-            line.append(f' g="{float(g[i]):.9g}"')
+            gi = g[i]
+            parts.append(f' g="{gi:.9g}"')
         elif bi is not None:
-            line.append(f' bi="{bi[i]:d}"')
-        line.append(" />\n")
-        chunk.append("".join(line))
+            parts.append(f' bi="{bi[i]:d}"')
+
+        parts.append(" />\n")
+        chunk.append("".join(parts))
+
         if len(chunk) >= CHUNK_LINES:
             f.write("".join(chunk))
             chunk.clear()
+
     if chunk:
         f.write("".join(chunk))
-    xml_i3d.write_close_tag(f, "Vertices", indent=indent + "  ")
+
+    write_close(f, "Vertices", indent=ind_child)
 
     # <Triangles ...>
-    xml_i3d.write_open_tag(f, "Triangles", {"count": tri_count}, indent=indent + "  ")
-    idx3 = indices.reshape(-1, 3)
+    write_open(f, "Triangles", {"count": tri_count}, indent=ind_child)
+
+    # Avoid reshape + row iteration + int() calls
+    flat = indices.ravel()
     chunk.clear()
-    for a, b, c in idx3:
-        chunk.append(f'{indent}    <t vi="{int(a)} {int(b)} {int(c)}" />\n')
+    for j in range(0, flat.size, 3):
+        a = flat[j]
+        b = flat[j + 1]
+        c = flat[j + 2]
+        chunk.append(f'{ind_line}<t vi="{a} {b} {c}" />\n')
         if len(chunk) >= CHUNK_LINES:
             f.write("".join(chunk))
             chunk.clear()
+
     if chunk:
         f.write("".join(chunk))
-    xml_i3d.write_close_tag(f, "Triangles", indent=indent + "  ")
+
+    write_close(f, "Triangles", indent=ind_child)
 
     # <Subsets ...>
-    xml_i3d.write_open_tag(f, "Subsets", {"count": len(built.subsets)}, indent=indent + "  ")
+    write_open(f, "Subsets", {"count": len(built.subsets)}, indent=ind_child)
     for s in built.subsets:
         slot_attr = (
-            f' materialSlotName="{xml_i3d.escape_attr(xml_i3d.fmt_attr_value(s.material_slot_name))}"'
-            if s.material_slot_name is not None
-            else ""
+            f' materialSlotName="{escape_attr(s.material_slot_name)}"' if s.material_slot_name is not None else ""
         )
         f.write(
-            f'{indent}    <Subset firstIndex="{s.first_index:d}" '
+            f'{ind_line}<Subset firstIndex="{s.first_index:d}" '
             f'numVertices="{s.num_vertices:d}" firstVertex="{s.first_vertex:d}" '
             f'numIndices="{s.num_indices:d}"{slot_attr} />\n'
         )
-    xml_i3d.write_close_tag(f, "Subsets", indent=indent + "  ")
-    # </IndexedTriangleSet>
-    xml_i3d.write_close_tag(f, "IndexedTriangleSet", indent=indent)
+    write_close(f, "Subsets", indent=ind_child)
+
+    write_close(f, "IndexedTriangleSet", indent=ind_tag)

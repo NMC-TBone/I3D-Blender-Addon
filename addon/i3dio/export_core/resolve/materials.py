@@ -59,7 +59,7 @@ def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> No
     if (p := _image_path(principled.normalmap_texture)) is not None:
         attrs = _set_tex("Normalmap", p)
         strength = principled.normalmap_strength
-        if not utility.isclose_number(strength, 1.0):
+        if not utility.isclose_any(strength, 1.0):
             attrs.setdefault("bumpDepth", strength)
 
     # Gloss/specular
