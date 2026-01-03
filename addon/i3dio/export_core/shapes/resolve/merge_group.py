@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from ...ctx import ExportContext
 
 
+MAX_BIND_NODES = 256  # total bind nodes (including root)
+
+
 def resolve_merge_groups(ctx: ExportContext) -> None:
     rep = ctx.section("merge_group")
 
@@ -32,32 +35,68 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
 
     for mg_index, node_ids in groups.items():
         if not (0 <= mg_index < len(scene_groups)):
-            rep.warning("MergeGroup index %d out of range (have %d groups); skipping", mg_index, len(scene_groups))
+            rep.warning(
+                "MergeGroup index %d out of range (have %d groups). This group will not be exported.",
+                mg_index,
+                len(scene_groups),
+                code="merge_group_index_out_of_range",
+            )
             continue
 
         mg = scene_groups[mg_index]
+        mg_label = mg.name or f"MergeGroup_{mg_index}"
         root_obj: bpy.types.Object | None = mg.root
         if not root_obj:
             rep.warning("MergeGroup %d has no root object; skipping", mg_index)
             continue
+
+        obj_rep = ctx.object_reporter(root_obj, "merge_group")
         if root_obj.type != "MESH":
-            rep.warning(
-                "MergeGroup %d root %r must be a Mesh object (got %s); skipping", mg_index, root_obj.name, root_obj.type
+            obj_rep.warning(
+                "MergeGroup %r root %r must be a Mesh object (got %s); it will not be exported.",
+                mg_label,
+                root_obj.name,
+                root_obj.type,
+                code="merge_group_root_not_mesh",
             )
             continue
 
         root_node_id = by_obj_ptr.get(root_obj.as_pointer())
         if root_node_id is None:
-            rep.warning("MergeGroup %d root %r is not part of the export; skipping", mg_index, root_obj.name)
+            obj_rep.warning(
+                "MergeGroup %r root %r is not part of the export; it will not be exported. "
+                "Ensure the root is included in export scope.",
+                mg_label,
+                root_obj.name,
+                code="merge_group_root_not_exported",
+            )
             continue
+
+        root_node = ctx.ir.scene_nodes[root_node_id]
 
         # bind order: root first, then the rest in traversal order (dedup just in case)
         ordered = list(dict.fromkeys([root_node_id, *node_ids]))
 
+        if len(ordered) == 1:
+            ctx.object_reporter(root_obj, "merge_group").warning(
+                "MergeGroup %r only contains the root (no member bind nodes). Remove the MergeGroup or add members.",
+                mg_label,
+                code="merge_group_single_bind_node",
+            )
+
+        if len(ordered) > MAX_BIND_NODES:
+            ctx.object_reporter(root_obj, "merge_group").warning(
+                "MergeGroup %r has %d bind nodes. Recommended maximum is %d; split into multiple MergeGroups.",
+                mg_label,
+                len(ordered),
+                MAX_BIND_NODES,
+                code="merge_group_bind_node_limit",
+            )
+
         # Create the merged ShapeEntry
         entry = ctx.shapes.add_merge_shape(
             root_obj=root_obj,
-            name=mg.name or f"MergeGroup_{mg_index}",
+            name=mg_label,
             mode=ShapeMode.MERGE_GROUP,
             variant=ShapeVariant.MERGE_GROUP,
             merge_group_index=mg_index,
@@ -73,16 +112,12 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
 
         bind_node_ids = [ctx.ir.scene_nodes[nid].id for nid in ordered]
         # Mutate IR nodes
-        root_node = ctx.ir.scene_nodes[root_node_id]
         root_node.kind = NodeKind.SHAPE
         root_node.shape_id = entry.id
         root_node.skin_bind_node_ids = bind_node_ids
 
-        for nid in ordered[1:]:
-            # Member nodes become TransformGroups
-            n = ctx.ir.scene_nodes[nid]
-            n.kind = NodeKind.TRANSFORM_GROUP
-            ctx.node_reporter(n, "merge_group").debug("Converted to TransformGroup (part of MergeGroup %d)", mg_index)
+        for nid in ordered[1:]:  # Member nodes become TransformGroups
+            ctx.ir.scene_nodes[nid].kind = NodeKind.TRANSFORM_GROUP
 
         rep.debug(
             "[%s] MergeGroup %d shapeId=%d binds=%d contrib_meshes=%d",

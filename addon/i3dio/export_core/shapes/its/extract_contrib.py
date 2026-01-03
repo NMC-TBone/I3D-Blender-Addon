@@ -83,8 +83,13 @@ def extract_contrib_its(
             rep = ctx.object_reporter(obj, "materials")
             valid_slot_idx = (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
 
-            if not np.all(valid_slot_idx):
-                rep.warning("Some triangles reference out-of-bounds material slots; using fallback/default material")
+            bad = np.count_nonzero(~valid_slot_idx)
+            if bad:
+                rep.warning(
+                    "%d triangles reference out-of-bounds material slots; using fallback/default material",
+                    bad,
+                    code="materials_slot_index_out_of_bounds",
+                )
 
             if np.any(valid_slot_idx):
                 # Detect empty slots among the indices that are in range.
@@ -93,8 +98,13 @@ def extract_contrib_its(
                 )
                 if np.any(slots_is_none):
                     v_idx = tri_mat_idx[valid_slot_idx]
-                    if np.any(slots_is_none[v_idx]):
-                        rep.warning("Some triangles reference empty material slots; using fallback/default material")
+                    empty_bad = np.count_nonzero(slots_is_none[v_idx])
+                    if empty_bad:
+                        rep.warning(
+                            "%d triangles reference empty material slots; using fallback/default material",
+                            empty_bad,
+                            code="materials_slot_is_empty",
+                        )
 
         if material_kind == MaterialKeyKind.SLOT_INDEX:
             # NORMAL shapes: keep slot indices; per-node materialIds mapping happens in assemble.
