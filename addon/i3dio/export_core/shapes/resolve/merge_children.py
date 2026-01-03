@@ -69,7 +69,7 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
             mode=ShapeMode.MERGE_CHILDREN_GENERIC,
             variant=ShapeVariant.MERGE_CHILDREN,
         )
-        entry.attrs.child("Vertices")["generic"] = True
+        entry.enable_generic_value01()
         for mesh_obj, ref_frame, g in contributors:
             entry.contributors.append(ShapeContributor(mesh_obj, ref_frame, generic_value01=g))
 

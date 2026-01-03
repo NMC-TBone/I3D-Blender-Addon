@@ -62,7 +62,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             variant=ShapeVariant.MERGE_GROUP,
             merge_group_index=mg_index,
         )
-        entry.attrs.child("Vertices")["singleblendweights"] = True
+        entry.enable_bind_index()
         root_frame = root_obj.matrix_world.copy()
 
         # Contributors + bind list (bind index == position in ordered list)

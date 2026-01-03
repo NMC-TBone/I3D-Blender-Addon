@@ -20,8 +20,7 @@ def write_node_attributes(
     skin_bind_node_ids: Sequence[int] | None = None,
     reference: NodeReference | None = None,
 ) -> None:
-    for k, v in emit_attrs.node.items():
-        xml_i3d.write_attribute(elem, k, v)
+    write_attributes(elem, emit_attrs.node)
 
     if material_ids is not None:
         xml_i3d.write_attribute(elem, "materialIds", ",".join(str(int(mid)) for mid in material_ids))

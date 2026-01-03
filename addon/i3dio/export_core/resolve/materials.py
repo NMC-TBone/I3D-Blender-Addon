@@ -39,12 +39,9 @@ def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> No
         attrs.setdefault("fileId", ctx.files.add_image(path))
         return attrs
 
-    def _tex_path(tex) -> str | None:
-        return _image_path(tex)
-
     skip_diffuse = False
     # Emission (wins over diffuse if present)
-    if (p := _tex_path(principled.emission_color_texture)) is not None:
+    if (p := _image_path(principled.emission_color_texture)) is not None:
         _set_tex("Emissivemap", p)
         skip_diffuse = True
     elif principled.emission_strength > 0:
@@ -53,13 +50,13 @@ def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> No
 
     # Base/diffuse
     if not skip_diffuse:
-        if (p := _tex_path(principled.base_color_texture)) is not None:
+        if (p := _image_path(principled.base_color_texture)) is not None:
             _set_tex("Texture", p)
         else:
             _set_color("diffuseColor", "Base Color", principled.base_color)
 
     # Normalmap
-    if (p := _tex_path(principled.normalmap_texture)) is not None:
+    if (p := _image_path(principled.normalmap_texture)) is not None:
         attrs = _set_tex("Normalmap", p)
         strength = principled.normalmap_strength
         if not utility.isclose_number(strength, 1.0):

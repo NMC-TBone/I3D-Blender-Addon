@@ -29,9 +29,8 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     if not entry.contributors:
         return None  # No contributors
 
-    vattrs = entry.attrs.children.get("Vertices", {})
-    want_g = vattrs.get("generic", False)
-    want_bi = vattrs.get("singleblendweights", False)
+    want_g = bool(getattr(entry, "want_generic_value01", False))
+    want_bi = bool(getattr(entry, "want_bind_index", False))
 
     # NORMAL shapes: subsets are keyed by material slot index and mapped to materialIds per Scene node.
     # Merge shapes: subsets are keyed by resolved global material ID (contributors may have different slot layouts).

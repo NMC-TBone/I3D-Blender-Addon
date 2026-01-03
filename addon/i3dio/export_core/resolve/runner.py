@@ -48,8 +48,8 @@ def resolve_all(ctx: "ExportContext") -> None:
     # resolve_constraints(ctx)
     # resolve_armatures(ctx)
 
-    resolve_shapes_build(ctx)
-    finalize_shape_material_ids(ctx)
+    valid_shapes = resolve_shapes_build(ctx)
+    finalize_shape_material_ids(ctx, valid_shapes)
 
     for m in ctx.materials.entries():
         resolve_material_properties(ctx, m)

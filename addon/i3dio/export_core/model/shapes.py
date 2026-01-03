@@ -1,3 +1,4 @@
+# i3dio/export_core/model/shapes.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -44,3 +45,14 @@ class ShapeEntry:
     mode: "ShapeMode"
     contributors: list["ShapeContributor"] = field(default_factory=list)
     attrs: EmitAttrs = field(default_factory=EmitAttrs)
+
+    want_generic_value01: bool = False  # MergeChildren "g"
+    want_bind_index: bool = False  # MergeGroup / skinned mesh "bi"
+
+    def enable_generic_value01(self) -> None:
+        self.want_generic_value01 = True
+        self.attrs.children.setdefault("Vertices", {})["generic"] = True
+
+    def enable_bind_index(self) -> None:
+        self.want_bind_index = True
+        self.attrs.children.setdefault("Vertices", {})["singleblendweights"] = True

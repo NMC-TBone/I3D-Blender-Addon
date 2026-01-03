@@ -1,3 +1,4 @@
+# addon/i3dio/export_core/model/its.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field

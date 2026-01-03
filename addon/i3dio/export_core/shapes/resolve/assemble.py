@@ -14,38 +14,37 @@ if TYPE_CHECKING:
     from ...ctx import ExportContext
 
 
-def _get_shape_id(node: SceneNode) -> int | None:
-    return node.shape_id
-
-
 def _index_emitted_shape_nodes_by_id(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
     shape_nodes_by_id: dict[int, list[SceneNode]] = defaultdict(list)
     for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, emitted_only=True):
-        sid = _get_shape_id(node)
+        sid = node.shape_id
         if sid is not None:
             shape_nodes_by_id[sid].append(node)
     return shape_nodes_by_id
 
 
-def resolve_shapes_build(ctx: "ExportContext") -> None:
+def resolve_shapes_build(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
     """
-    Build built geometry for referenced shapes (cached in ctx.shapes.built_by_id).
+    Build/validate geometry for referenced shapes.
 
-    Only builds/validates shape geometry and converts invalid shapes to TransformGroup.
+    Returns:
+        shape_nodes_by_id for shapes that built successfully.
 
-    materialIds are finalized in a dedicated pass: finalize_shape_material_ids().
+    Side-effects:
+        - Invalid shapes are converted to TransformGroup (nodes mutated).
+        - Built geometry is cached in ctx.shapes.built_by_id via ctx.shapes.get_built().
     """
     rep = ctx.section("shapes")
 
     # Map shapeId -> [node]
     shape_nodes_by_id = _index_emitted_shape_nodes_by_id(ctx)
-
     if not shape_nodes_by_id:
         rep.debug("No shape nodes with shapeId; skipping build")
-        return
+        return {}
+
     rep.debug("Building %d referenced shapes", len(shape_nodes_by_id))
 
-    # Build only the shapes that are referenced by Scene nodes
+    valid: dict[int, list[SceneNode]] = {}
     for shape_id, nodes in shape_nodes_by_id.items():
         built = ctx.shapes.get_built(shape_id)
         if built is None:
@@ -62,29 +61,30 @@ def resolve_shapes_build(ctx: "ExportContext") -> None:
             built.triangle_count,
             len(built.material_ids),
         )
+        valid[shape_id] = nodes
+
+    return valid
 
 
-def finalize_shape_material_ids(ctx: "ExportContext") -> None:
+def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[int, list[SceneNode]]) -> None:
     """Finalize materialIds for Scene nodes.
 
-    Centralizes:
-    - clearing shape bindings on non-shape nodes
-    - writing materialIds on shape nodes (per-node for NORMAL, shared for merge modes)
+    Expects:
+        shape_nodes_by_id contains only shapes that built successfully.
 
-    This is intentionally a late pass so invalid shapes never receive materialIds.
+    Centralizes:
+      - clearing stale shape bindings on non-shape nodes
+      - writing materialIds on shape nodes (per-node for NORMAL, shared for merge modes)
     """
     rep = ctx.section("shapes")
 
-    # First: clear any stale shape bindings on non-shape nodes.
+    # Safety invariant: non-shape nodes must not carry shape bindings
     for node in ctx.ir.iter_nodes(emitted_only=True):
         if node.kind != NodeKind.SHAPE:
             clear_shape_binding(node)
 
-    # Map shapeId -> [node]
-    shape_nodes_by_id = _index_emitted_shape_nodes_by_id(ctx)
-
     if not shape_nodes_by_id:
-        rep.debug("No shape nodes with shapeId; skipping materialIds finalize")
+        rep.debug("No valid shape nodes; skipping materialIds finalize")
         return
 
     wrote_nodes = 0

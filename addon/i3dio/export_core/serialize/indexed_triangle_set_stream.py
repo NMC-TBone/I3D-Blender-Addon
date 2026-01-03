@@ -68,10 +68,11 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     # <Subsets ...>
     xml_i3d.write_open_tag(f, "Subsets", {"count": len(built.subsets)}, indent=indent + "  ")
     for s in built.subsets:
-        slot_attr = ""
-        if s.material_slot_name is not None:
-            escaped = xml_i3d.escape_attr(xml_i3d.fmt_attr_value(s.material_slot_name))
-            slot_attr = f' materialSlotName="{escaped}"'
+        slot_attr = (
+            f' materialSlotName="{xml_i3d.escape_attr(xml_i3d.fmt_attr_value(s.material_slot_name))}"'
+            if s.material_slot_name is not None
+            else ""
+        )
         f.write(
             f'{indent}    <Subset firstIndex="{s.first_index:d}" '
             f'numVertices="{s.num_vertices:d}" firstVertex="{s.first_vertex:d}" '
