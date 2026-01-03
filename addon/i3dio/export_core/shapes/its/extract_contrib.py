@@ -9,7 +9,7 @@ import numpy as np
 from ...blender.evaluated_mesh import evaluated_mesh_for_export, free_evaluated_mesh
 from .. import ShapeContributor
 from . import ItsContributorStream, MaterialKeyKind
-from .material_resolve import resolve_slots
+from .material_resolve import materials_requiring_vcol, resolve_slots
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
@@ -26,7 +26,7 @@ def extract_contrib_its(
     material_kind: MaterialKeyKind = MaterialKeyKind.SLOT_INDEX,
 ) -> ItsContributorStream | None:
     obj = contrib.obj
-    if not isinstance(obj, bpy.types.Object) or obj.type != "MESH":
+    if not isinstance(obj, bpy.types.Object) or not isinstance(obj.data, bpy.types.Mesh):
         return None
 
     ev_obj, mesh = evaluated_mesh_for_export(ctx, obj, reference_frame=contrib.reference_frame)
@@ -41,7 +41,8 @@ def extract_contrib_its(
         loop_vert_idx = np.empty(num_loops, dtype=np.int32)
         mesh.loops.foreach_get("vertex_index", loop_vert_idx)
 
-        vert_co = np.empty((len(mesh.vertices), 3), dtype=np.float32)
+        len_verts = len(mesh.vertices)
+        vert_co = np.empty((len_verts, 3), dtype=np.float32)
         mesh.vertices.foreach_get("co", vert_co.ravel())
         positions = vert_co[loop_vert_idx]  # (L,3)
 
@@ -60,6 +61,18 @@ def extract_contrib_its(
             uv = np.empty((num_loops, 2), dtype=np.float32)
             ul.data.foreach_get("uv", uv.ravel())
             uvs.append(uv)
+
+        # ---- vertex colors (optional) ----
+        color = None
+        if len(mesh.color_attributes):
+            layer = mesh.color_attributes.active_color or mesh.color_attributes[0]
+            is_point = layer.domain == "POINT"
+            src_len = len_verts if is_point else num_loops
+
+            colors_srgb = np.empty((src_len, 4), dtype=np.float32)
+            layer.data.foreach_get("color_srgb", colors_srgb.ravel())
+
+            color = colors_srgb[loop_vert_idx] if is_point else colors_srgb
 
         # ---- triangles as loop indices ----
         tri_loops = np.empty(num_triangles * 3, dtype=np.int32)
@@ -130,6 +143,22 @@ def extract_contrib_its(
             else:
                 tri_mat_key.fill(fallback_id)
 
+        # ---- determine color export mode ----
+        # NOTE: use source mesh datablock for i3d_attribtues (evaluated mesh may lack them)
+        mode = _effective_color_export_mode(ctx, obj.data)
+        if mode == "AUTO":
+            mats_need = materials_requiring_vcol(slot_materials)
+            want_color_attr = bool(mats_need)
+            if mats_need and color is None:
+                ctx.object_reporter(obj, "vertex_colors").warning(
+                    "Vertex color attribute is required by material(s): %s, but this mesh has no vertex color layer. "
+                    "Export will pad zeros. Add/paint a vertex color layer or switch color export mode.",
+                    ", ".join(mats_need),
+                    code="vertex_color_missing_required",
+                )
+        else:  # "IF_PRESENT"
+            want_color_attr = color is not None
+
         # ---- merge features ----
         generic_value01 = None
         if want_g:
@@ -145,6 +174,8 @@ def extract_contrib_its(
             positions=positions,
             normals=normals,
             uvs=uvs,
+            want_color_attr=want_color_attr,
+            color=color,
             tri_loops=tri_loops,
             tri_mat_id=tri_mat_key,
             generic_value01=generic_value01,
@@ -153,3 +184,13 @@ def extract_contrib_its(
 
     finally:
         free_evaluated_mesh(ev_obj)
+
+
+def _effective_color_export_mode(ctx: "ExportContext", src_mesh: bpy.types.Mesh) -> str:
+    override = ctx.settings.get("vertex_color_override", "USE_MESH")
+    if override == "FORCE_AUTO":
+        return "AUTO"
+    if override == "FORCE_IF_PRESENT":
+        return "IF_PRESENT"
+    # USE_MESH
+    return getattr(getattr(src_mesh, "i3d_attributes", None), "color_export", "AUTO")

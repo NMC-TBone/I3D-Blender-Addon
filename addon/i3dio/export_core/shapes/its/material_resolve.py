@@ -46,3 +46,14 @@ def choose_fallback_material_id(ctx: "ExportContext", *, slot_materials: list[bp
     if len(valid) == 1:
         return ctx.materials.get_or_add(valid[0])
     return None
+
+
+def materials_requiring_vcol(slot_materials: list[bpy.types.Material | None]) -> list[str]:
+    out: list[str] = []
+    for mat in slot_materials:
+        if mat is None or not isinstance(mat, bpy.types.Material):
+            continue
+        req = getattr(getattr(mat, "i3d_attributes", None), "required_vertex_attributes", None)
+        if req and any(("color" in a.name) for a in req):
+            out.append(mat.name)
+    return out

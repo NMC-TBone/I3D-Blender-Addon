@@ -39,8 +39,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         if shape_id in self.built_by_id:
             return self.built_by_id[shape_id]
 
-        entry = self.get_entry(shape_id)
-        built = build_indexed_triangle_set(self.ctx, entry)
+        built = build_indexed_triangle_set(self.ctx, self.get_entry(shape_id))
         self.built_by_id[shape_id] = built  # cache success OR failure
         return built
 

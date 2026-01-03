@@ -23,6 +23,7 @@ class MaterialKeyKind(str, Enum):
 
 
 Vec3f = np.ndarray  # (N,3) float32
+Vec4f = np.ndarray  # (N,4) float32
 Vec2f = np.ndarray  # (N,2) float32
 ArrI = np.ndarray  # (M,) int32/uint32
 
@@ -52,6 +53,7 @@ class BuiltITS:
 
     # Optional/variable
     uvs: list[Vec2f] = field(repr=False, default_factory=list)  # 0..4, each (N,2) float32
+    color: Vec4f | None = field(repr=False, default=None)  # (N,4) float32 RGBA
 
     g: np.ndarray | None = None
     bi: np.ndarray | None = None
@@ -75,6 +77,8 @@ class ItsContributorStream:
     positions: np.ndarray  # (L,3) float32
     normals: np.ndarray  # (L,3) float32 (mandatory)
     uvs: list[np.ndarray]  # 0..4 each (L,2) float32
+    want_color_attr: bool
+    color: np.ndarray | None  # (L,4) float32 RGBA
 
     tri_loops: np.ndarray  # (T,3) int32, loop indices
     tri_mat_id: np.ndarray  # (T,) int32, material key per tri (see BuiltITS.material_kind)

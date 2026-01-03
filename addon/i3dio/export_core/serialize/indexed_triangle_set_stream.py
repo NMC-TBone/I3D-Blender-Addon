@@ -15,6 +15,7 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     positions = built.positions
     normals = built.normals
     uvs = built.uvs
+    color = built.color
     g = built.g
     bi = built.bi
     indices = built.indices
@@ -41,6 +42,8 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     v_attrs: dict[str, object] = {"count": vcount, "normal": True}
     for li in range(len(uvs)):
         v_attrs[f"uv{li}"] = True
+    if color is not None:
+        v_attrs["color"] = True
     v_attrs.update(built.attrs.children.get("Vertices", {}))
     write_open(f, "Vertices", v_attrs, indent=ind_child)
 
@@ -74,6 +77,9 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
         if uv3 is not None:
             uv = uv3[i]
             line += f' t3="{uv[0]:.6g} {uv[1]:.6g}"'
+        if color is not None:
+            col = color[i]
+            line += f' c="{col[0]:.6g} {col[1]:.6g} {col[2]:.6g} {col[3]:.6g}"'
         if g is not None:
             line += f' g="{g[i]:.9g}"'
         elif bi is not None:

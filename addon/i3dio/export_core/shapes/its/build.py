@@ -29,8 +29,8 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     if not entry.contributors:
         return None  # No contributors
 
-    want_g = bool(getattr(entry, "want_generic_value01", False))
-    want_bi = bool(getattr(entry, "want_bind_index", False))
+    want_g = entry.want_generic_value01
+    want_bi = entry.want_bind_index
 
     # NORMAL shapes: subsets are keyed by material slot index and mapped to materialIds per Scene node.
     # Merge shapes: subsets are keyed by resolved global material ID (contributors may have different slot layouts).
@@ -44,8 +44,6 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     if not contrib_streams:
         return None  # No valid mesh data
 
-    max_uv = min(max((len(s.uvs) for s in contrib_streams), default=0), 4)
-
     total_loops = sum(s.loop_count for s in contrib_streams)
     total_tris = sum(int(s.tri_loops.shape[0]) for s in contrib_streams)
     if total_loops <= 0 or total_tris <= 0:
@@ -53,7 +51,11 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
 
     positions = np.empty((total_loops, 3), dtype=np.float32)
     normals = np.empty((total_loops, 3), dtype=np.float32)
+    max_uv = min(max((len(s.uvs) for s in contrib_streams), default=0), 4)
     uvs_out = [np.empty((total_loops, 2), dtype=np.float32) for _ in range(max_uv)]
+    color_out = (
+        np.empty((total_loops, 4), dtype=np.float32) if any(s.want_color_attr for s in contrib_streams) else None
+    )
 
     g_out = np.empty((total_loops,), dtype=np.float32) if want_g else None
     bi_out = np.empty((total_loops,), dtype=np.int32) if want_bi else None
@@ -82,6 +84,12 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
             else:
                 for li in range(max_uv):
                     uvs_out[li][vs] = 0.0
+        # Add colors for contributor and fill with zeros if missing
+        if color_out is not None:
+            if s.color is not None:
+                color_out[vs] = s.color
+            else:
+                color_out[vs] = 0.0
 
         if want_g and g_out is not None:
             g_out[vs] = 0.0 if s.generic_value01 is None else s.generic_value01
@@ -122,6 +130,7 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
         subsets=subsets,
         material_ids=material_ids,
         uvs=uvs_out,
+        color=color_out,
         g=g_out,
         bi=bi_out,
         attrs=entry.attrs,

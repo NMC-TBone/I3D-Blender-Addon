@@ -34,3 +34,10 @@ class MaterialEntry:
         if mat.i3d_attributes.use_material_slot_name:
             return mat.i3d_attributes.material_slot_name or mat.name
         return None
+
+    def get_require_vcol(self) -> bool:
+        """Return True if this material requires vertex colors."""
+        mat = self.blender_material
+        if mat is None or not isinstance(mat, bpy.types.Material):
+            return False
+        return any("color" in attr.name.lower() for attr in mat.i3d_attributes.required_vertex_attributes)
