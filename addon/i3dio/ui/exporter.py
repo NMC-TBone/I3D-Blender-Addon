@@ -29,7 +29,7 @@ class I3DShaderFolderEntry(bpy.types.PropertyGroup):
         name="Shader Folder",
         description="Directory containing custom shader XML files",
         subtype='DIR_PATH',
-        default='',
+        default="",
         update=update_path,
         options={'PATH_SUPPORTS_BLEND_RELATIVE'},
     )
@@ -45,7 +45,7 @@ class I3DExportUIProperties(bpy.types.PropertyGroup):
             "contain an '<i3dMapping> somewhere in the file"
         ),
         subtype='FILE_PATH',
-        default='',
+        default="",
         options={'PATH_SUPPORTS_BLEND_RELATIVE'},
     )
 
@@ -58,7 +58,7 @@ class I3DExportUIProperties(bpy.types.PropertyGroup):
         name="ModDesc Path",
         description="Path to the modDesc.xml file. If set, Brand Material Templates will be loaded from it",
         subtype='FILE_PATH',
-        default='',
+        default="",
         update=update_moddesc_path,
         options={'PATH_SUPPORTS_BLEND_RELATIVE'},
     )
@@ -257,7 +257,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
             "contain an '<i3dMapping> somewhere in the file"
         ),
         subtype='FILE_PATH',
-        default='',
+        default="",
         options={'PATH_SUPPORTS_BLEND_RELATIVE'},
     )
 
@@ -353,10 +353,10 @@ class I3D_IO_OT_export(Operator, ExportHelper):
 
 def export_main(layout: bpy.types.UILayout, operator, is_file_browser: bool):
     if is_file_browser:
-        layout.prop(operator, 'selection')
+        layout.prop(operator, "selection")
         if operator.selection == 'SELECTED_OBJECTS':
-            layout.prop(operator, 'selection_traverse_children')
-    layout.prop(operator, 'object_sorting_prefix')
+            layout.prop(operator, "selection_traverse_children")
+    layout.prop(operator, "object_sorting_prefix")
 
 
 def export_options(layout: bpy.types.UILayout, operator):
@@ -365,17 +365,17 @@ def export_options(layout: bpy.types.UILayout, operator):
     if body:
         col = body.column()
         col.enabled = bool(bpy.context.preferences.addons[base_package].preferences.i3d_converter_path)
-        col.prop(operator, 'binarize_i3d')
+        col.prop(operator, "binarize_i3d")
         col = body.column()
-        col.prop(operator, 'keep_collections_as_transformgroups')
-        col.prop(operator, 'apply_modifiers')
-        col.prop(operator, 'apply_unit_scale')
-        col.prop(operator, 'alphabetic_uvs')
-        col.prop(operator, 'vertex_color_override')
+        col.prop(operator, "keep_collections_as_transformgroups")
+        col.prop(operator, "apply_modifiers")
+        col.prop(operator, "apply_unit_scale")
+        col.prop(operator, "alphabetic_uvs")
+        col.prop(operator, "vertex_color_override")
         body.separator(type='LINE')
-        body.prop(operator, 'object_types_to_export', expand=True)
+        body.prop(operator, "object_types_to_export", expand=True)
         body.separator(type='LINE')
-        body.prop(operator, 'features_to_export', expand=True)
+        body.prop(operator, "features_to_export", expand=True)
         body.separator(type='LINE')
         body.prop(operator, "axis_forward")
         body.prop(operator, "axis_up")
@@ -385,26 +385,26 @@ def export_files(layout, operator):
     header, body = layout.panel("I3D_export_files", default_closed=False)
     header.label(text="File Options")
     if body:
-        body.prop(operator, 'copy_files')
+        body.prop(operator, "copy_files")
         col = body.column()
         col.enabled = operator.copy_files
-        col.prop(operator, 'overwrite_files')
-        col.prop(operator, 'file_structure')
+        col.prop(operator, "overwrite_files")
+        col.prop(operator, "file_structure")
 
 
 def export_debug(layout, operator):
     header, body = layout.panel("I3D_export_debug", default_closed=False)
     header.label(text="Debug Options")
     if body:
-        body.prop(operator, 'verbose_output')
-        body.prop(operator, 'log_to_file')
+        body.prop(operator, "verbose_output")
+        body.prop(operator, "log_to_file")
 
 
 def export_i3d_mapping(layout, operator):
     header, body = layout.panel("I3D_export_i3d_mapping", default_closed=False)
     header.label(text="I3D Mapping Options")
     if body:
-        body.prop(operator, 'i3d_mapping_file_path')
+        body.prop(operator, "i3d_mapping_file_path")
 
 
 @register
@@ -472,12 +472,12 @@ class I3D_IO_PT_i3d_scene(Panel):
         header, body = layout.panel("i3d_mapping_options", default_closed=False)
         header.label(text="I3D Mapping Options")
         if body:
-            body.prop(scene_props, 'i3d_mapping_file_path')
+            body.prop(scene_props, "i3d_mapping_file_path")
 
         header, body = layout.panel("i3d_moddesc_options", default_closed=False)
         header.label(text="ModDesc Options")
         if body:
-            body.prop(scene_props, 'moddesc_path')
+            body.prop(scene_props, "moddesc_path")
 
         header, body = layout.panel("i3d_custom_shader_paths", default_closed=False)
         header.label(text="Custom Shader Folders")
