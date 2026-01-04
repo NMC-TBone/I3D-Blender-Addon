@@ -85,6 +85,25 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         )
         return self._alloc_entry(key=key, name=name, mode=mode)
 
+    def add_skinned_mesh_shape(self, obj: bpy.types.Object, *, name: str | None = None) -> ShapeEntry:
+        """Create a per-object skinned mesh shape entry.
+
+        We force apply_modifiers=False to keep mesh vertex topology aligned with
+        Object vertex groups and weight data.
+        """
+        mesh = obj.data
+        key = ShapeKey(
+            kind="IndexedTriangleSet",
+            data_ptr=mesh.as_pointer() if hasattr(mesh, "as_pointer") else 0,
+            object_ptr=obj.as_pointer(),
+            apply_modifiers=False,
+            variant=ShapeVariant.SKINNED_MESH,
+        )
+        entry = self._alloc_entry(key=key, name=name or getattr(mesh, "name", obj.name), mode=ShapeMode.SKINNED_MESH)
+        entry.enable_skin_weights()
+        entry.contributors.append(ShapeContributor(obj=obj, reference_frame=None))
+        return entry
+
     def link_node(self, node: SceneNode) -> None:
         """Link a SceneNode to a ShapeEntry by setting node.shape_id."""
         ref = node.blender_ref

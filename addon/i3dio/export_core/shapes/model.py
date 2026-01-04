@@ -25,3 +25,6 @@ class ShapeContributor:
 
     # MergeGroup / singleblendweights
     bind_index: int | None = None  # 0..N-1
+
+    # Skinned mesh: mapping from Blender vertex group index -> bind index in skinBindNodeIds list
+    skin_vgroup_to_bind_index: dict[int, int] | None = None

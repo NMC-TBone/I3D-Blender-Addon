@@ -22,6 +22,7 @@ def extract_contrib_its(
     contrib: ShapeContributor,
     want_g: bool,
     want_bi: bool,
+    want_skin: bool,
     *,
     material_kind: MaterialKeyKind = MaterialKeyKind.SLOT_INDEX,
 ) -> ItsContributorStream | None:
@@ -168,6 +169,44 @@ def extract_contrib_its(
         if want_bi:
             bind_idx = np.full((num_loops,), int(contrib.bind_index or 0), dtype=np.int32)
 
+        blend_weights = None
+        blend_indices = None
+        if want_skin:
+            # Build bw/bi for each loop vertex from the underlying vertex weights.
+            # We only consider vertex groups that map to exported bind nodes.
+            vmap = contrib.skin_vgroup_to_bind_index or {}
+
+            # Collect top-4 weights per vertex (mesh.vertices domain), then expand to loops.
+            bw_v = np.zeros((len_verts, 4), dtype=np.float32)
+            bi_v = np.zeros((len_verts, 4), dtype=np.int32)
+
+            # Iterate vertices; typical meshes aren't huge and this keeps code simple.
+            for vi, v in enumerate(mesh.vertices):
+                items: list[tuple[int, float]] = []
+                for g in v.groups:
+                    if (bind_idx := vmap.get(int(g.group))) is None:
+                        continue
+                    w = float(g.weight)
+                    if w > 0.0:
+                        items.append((int(bind_idx), w))
+                if not items:
+                    continue
+
+                # Keep highest weights, deterministic tie-break by bind index.
+                items.sort(key=lambda it: (-it[1], it[0]))
+                items = items[:4]
+
+                total = sum(w for _, w in items)
+                if total <= 0.0:
+                    continue
+
+                for slot, (bidx, w) in enumerate(items):
+                    bi_v[vi, slot] = bidx
+                    bw_v[vi, slot] = w / total
+
+            blend_weights = bw_v[loop_vert_idx]
+            blend_indices = bi_v[loop_vert_idx]
+
         return ItsContributorStream(
             obj_name=obj.name,
             loop_count=num_loops,
@@ -180,6 +219,8 @@ def extract_contrib_its(
             tri_mat_id=tri_mat_key,
             generic_value01=generic_value01,
             bind_idx=bind_idx,
+            blend_weights=blend_weights,
+            blend_indices=blend_indices,
         )
 
     finally:

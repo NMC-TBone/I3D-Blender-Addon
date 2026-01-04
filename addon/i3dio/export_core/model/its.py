@@ -58,6 +58,10 @@ class BuiltITS:
     g: np.ndarray | None = None
     bi: np.ndarray | None = None
 
+    # Skinned mesh multi-weight data (per loop vertex). Both are (N,4).
+    bw: np.ndarray | None = None  # float32 weights
+    bi4: np.ndarray | None = None  # int32 bind indices
+
     attrs: EmitAttrs = field(default_factory=EmitAttrs)
 
     @property
@@ -85,3 +89,7 @@ class ItsContributorStream:
 
     generic_value01: np.ndarray | None  # (L,) float32
     bind_idx: np.ndarray | None  # (L,) int32 (or float32 if writer expects float)
+
+    # Skinned mesh: (L,4)
+    blend_weights: np.ndarray | None = None  # float32
+    blend_indices: np.ndarray | None = None  # int32

@@ -5,11 +5,13 @@ from ..shapes.resolve.assemble import finalize_shape_material_ids, resolve_shape
 from ..shapes.resolve.link import resolve_shape_links
 from ..shapes.resolve.merge_children import resolve_merge_children
 from ..shapes.resolve.merge_group import resolve_merge_groups
+from ..shapes.resolve.skinned_mesh import resolve_skinned_meshes
 
 __all__ = [
     "finalize_shape_material_ids",
     "resolve_merge_children",
     "resolve_merge_groups",
+    "resolve_skinned_meshes",
     "resolve_shape_links",
     "resolve_shapes_build",
 ]

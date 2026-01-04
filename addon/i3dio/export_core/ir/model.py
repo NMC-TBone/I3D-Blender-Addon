@@ -114,6 +114,9 @@ class IRIndex:
     merge_group_nodes_by_index: dict[int, list[int]] = field(default_factory=dict)  # mg_index -> [node ids]
     skinned_mesh_nodes: list[int] = field(default_factory=list)
 
+    # Armature ptr -> {bone_name: bone_node_id} (built in resolve_armatures)
+    bone_nodes_by_armature_ptr: dict[int, dict[str, int]] = field(default_factory=dict)
+
 
 @dataclass(slots=True)
 class ExportIR:

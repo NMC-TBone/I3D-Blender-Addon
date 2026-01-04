@@ -18,6 +18,8 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     color = built.color
     g = built.g
     bi = built.bi
+    bw = getattr(built, "bw", None)
+    bi4 = getattr(built, "bi4", None)
     indices = built.indices
 
     vcount = int(positions.shape[0])
@@ -80,10 +82,19 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
         if color is not None:
             col = color[i]
             line += f' c="{col[0]:.6g} {col[1]:.6g} {col[2]:.6g} {col[3]:.6g}"'
+        # generic have priority over merge group and skinning
         if g is not None:
             line += f' g="{g[i]:.9g}"'
+        # merge group have priority over skinning
         elif bi is not None:
             line += f' bi="{bi[i]:d}"'
+        elif bw is not None and bi4 is not None:
+            w = bw[i]
+            ii = bi4[i]
+            line += (
+                f' bw="{w[0]:.9g} {w[1]:.9g} {w[2]:.9g} {w[3]:.9g}"'
+                f' bi="{int(ii[0])} {int(ii[1])} {int(ii[2])} {int(ii[3])}"'
+            )
 
         line += " />\n"
         append(line)

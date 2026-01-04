@@ -19,6 +19,7 @@ class ShapeVariant(StrEnum):
     NORMAL = "NORMAL"
     MERGE_CHILDREN = "MERGE_CHILDREN"
     MERGE_GROUP = "MERGE_GROUP"
+    SKINNED_MESH = "SKINNED_MESH"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +49,7 @@ class ShapeEntry:
 
     want_generic_value01: bool = False  # MergeChildren "g"
     want_bind_index: bool = False  # MergeGroup / skinned mesh "bi"
+    want_skin_weights: bool = False  # Skinned mesh multi-weight (bw/bi)
 
     def enable_generic_value01(self) -> None:
         self.want_generic_value01 = True
@@ -56,3 +58,7 @@ class ShapeEntry:
     def enable_bind_index(self) -> None:
         self.want_bind_index = True
         self.attrs.children.setdefault("Vertices", {})["singleblendweights"] = True
+
+    def enable_skin_weights(self) -> None:
+        self.want_skin_weights = True
+        self.attrs.children.setdefault("Vertices", {})["blendweights"] = True

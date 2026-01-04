@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING
 
+from .armatures import resolve_armatures
 from .kinds import resolve_kind_for_node
 from .mappings import finalize_i3d_mapping_for_node
 from .materials import resolve_material_shading
@@ -16,6 +17,7 @@ from .shapes import (
     resolve_merge_groups,
     resolve_shape_links,
     resolve_shapes_build,
+    resolve_skinned_meshes,
 )
 
 if TYPE_CHECKING:
@@ -36,8 +38,11 @@ def resolve_all(ctx: "ExportContext") -> None:
         resolve_kind_for_node(ctx, node)
         finalize_name_for_node(ctx, node)
 
+    resolve_armatures(ctx)
+
     resolve_merge_children(ctx)
     resolve_merge_groups(ctx)
+    resolve_skinned_meshes(ctx)
     resolve_shape_links(ctx)
 
     for node in ctx.ir.scene_nodes.values():
@@ -46,7 +51,6 @@ def resolve_all(ctx: "ExportContext") -> None:
 
     # resolve/fixups (future)
     # resolve_constraints(ctx)
-    # resolve_armatures(ctx)
 
     valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)

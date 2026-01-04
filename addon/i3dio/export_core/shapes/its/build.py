@@ -31,6 +31,7 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
 
     want_g = entry.want_generic_value01
     want_bi = entry.want_bind_index
+    want_skin = getattr(entry, "want_skin_weights", False)
 
     # NORMAL shapes: subsets are keyed by material slot index and mapped to materialIds per Scene node.
     # Merge shapes: subsets are keyed by resolved global material ID (contributors may have different slot layouts).
@@ -38,7 +39,14 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
 
     contrib_streams: list[ItsContributorStream] = []
     for contrib in entry.contributors:
-        stream = extract_contrib_its(ctx, contrib, want_g=want_g, want_bi=want_bi, material_kind=material_kind)
+        stream = extract_contrib_its(
+            ctx,
+            contrib,
+            want_g=want_g,
+            want_bi=want_bi,
+            want_skin=want_skin,
+            material_kind=material_kind,
+        )
         if stream is not None:
             contrib_streams.append(stream)
     if not contrib_streams:
@@ -59,6 +67,8 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
 
     g_out = np.empty((total_loops,), dtype=np.float32) if want_g else None
     bi_out = np.empty((total_loops,), dtype=np.int32) if want_bi else None
+    bw_out = np.empty((total_loops, 4), dtype=np.float32) if want_skin else None
+    bi4_out = np.empty((total_loops, 4), dtype=np.int32) if want_skin else None
 
     tri_loops_all = np.empty((total_tris, 3), dtype=np.int32)
     tri_mat_id_all = np.empty((total_tris,), dtype=np.int32)
@@ -97,6 +107,14 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
         if want_bi and bi_out is not None:
             bi_out[vs] = 0 if s.bind_idx is None else s.bind_idx
 
+        if want_skin and bw_out is not None and bi4_out is not None:
+            if s.blend_weights is not None and s.blend_indices is not None:
+                bw_out[vs] = s.blend_weights
+                bi4_out[vs] = s.blend_indices
+            else:
+                bw_out[vs] = 0.0
+                bi4_out[vs] = 0
+
         ts = slice(t_offset, t_offset + tc)
         tri_loops_all[ts] = s.tri_loops + np.int32(v_offset)
         tri_mat_id_all[ts] = s.tri_mat_id
@@ -133,5 +151,7 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
         color=color_out,
         g=g_out,
         bi=bi_out,
+        bw=bw_out,
+        bi4=bi4_out,
         attrs=entry.attrs,
     )
