@@ -112,8 +112,7 @@ class IRIndex:
 
     merge_children_roots: list[int] = field(default_factory=list)  # node ids
     merge_group_nodes_by_index: dict[int, list[int]] = field(default_factory=dict)  # mg_index -> [node ids]
-    # (future)
-    # skinned_mesh_nodes: list[int] = field(default_factory=list)
+    skinned_mesh_nodes: list[int] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -156,7 +155,7 @@ class ExportIR:
     def attach(self, node_id: int, parent_id: int | None) -> None:
         """Attach node under parent_id (or to roots if parent_id is None)."""
         n = self.scene_nodes[node_id]
-        # if already attached, detach first
+        # if already attached, detach first to avoid duplicates
         if n.parent_id is not None or node_id in self.roots:
             self.detach(node_id)
 

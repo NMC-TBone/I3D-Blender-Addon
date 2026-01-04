@@ -22,7 +22,7 @@ def _is_excluded(obj: bpy.types.Object) -> bool:
 
 
 def _is_merge_children_root(ctx: ExportContext, obj: bpy.types.Object) -> bool:
-    if obj.type != "MESH":
+    if obj.type != 'MESH':
         return False
     mc = getattr(obj, "i3d_merge_children", None)
     if not mc or not getattr(mc, "enabled", False):

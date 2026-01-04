@@ -75,12 +75,11 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         variant: ShapeVariant,
         merge_group_index: int | None = None,
     ) -> ShapeEntry:
-        apply_modifiers = self.ctx.settings.get("apply_modifiers", True)
         key = ShapeKey(
             kind="IndexedTriangleSet",
             data_ptr=0,
             object_ptr=root_obj.as_pointer(),
-            apply_modifiers=apply_modifiers,
+            apply_modifiers=self.ctx.settings.get("apply_modifiers", True),
             variant=variant,
             merge_group_index=merge_group_index,
         )

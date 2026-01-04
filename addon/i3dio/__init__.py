@@ -1,13 +1,15 @@
 # This fixes reloading, by deleting the module references and thus forcing a reload
 if "bpy" in locals():
     import sys
+
     for module in list(sys.modules):
         if __name__ in module:
             del sys.modules[module]
 
+import bpy
+
 from . import ui
 
-import bpy
 
 def register():
     ui.helper_functions.register()
@@ -26,11 +28,9 @@ def register():
     ui.user_attributes.register()
     ui.mesh.register()
     ui.light.register()
-    bpy.types.TOPBAR_MT_file_export.append(ui.exporter.menu_func_export)
 
 
 def unregister():
-    bpy.types.TOPBAR_MT_file_export.remove(ui.exporter.menu_func_export)
     ui.exporter.unregister()
     ui.dds_exporter.unregister()
     ui.user_attributes.unregister()
