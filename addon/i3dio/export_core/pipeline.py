@@ -59,13 +59,13 @@ def _build_ir(ctx: ExportContext, *, context: bpy.types.Context) -> None:
             if context.active_object is None:
                 reporter.fail("No active object for export")
             reporter.info("Exporting active object %r", context.active_object.name)
-            traverse.build_from_roots(ctx, [context.active_object])
+            traverse.build_from_objects(ctx, [context.active_object])
         case "SELECTED_OBJECTS":
             if not context.selected_objects:
                 reporter.fail("No objects selected for export")
             reporter.info("Exporting %d selected objects", len(context.selected_objects))
             if ctx.settings.get("selection_traverse_children", False):
-                traverse.build_from_roots(ctx, context.selected_objects)
+                traverse.build_from_objects(ctx, context.selected_objects)
             else:
                 traverse.build_selected_only(ctx, context.selected_objects)
         case _:

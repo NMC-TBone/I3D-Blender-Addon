@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Any
 
 import bpy
@@ -141,7 +142,7 @@ def add_indentations(element: XML_Element, level: int = 0, *, skip_tags: set[str
 
 def write_tree_to_file(
     tree: ET.ElementTree,
-    file_path: str,
+    file_path: str | Path,
     *argv,
     pretty: bool = True,
     skip_indent_tags: set[str] | None = None,
@@ -167,7 +168,7 @@ def write_close_tag(f, tag: str, indent: str = "") -> None:
 def export_to_i3d_file(
     *,
     root: ET.Element,
-    file_path: str,
+    file_path: str | Path,
     shapes_writer=None,  # optional callable(f)
     encoding: str = "iso-8859-1",
     xml_declaration: bool = True,

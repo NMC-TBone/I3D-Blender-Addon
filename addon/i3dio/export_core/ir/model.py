@@ -1,3 +1,4 @@
+# i3dio/export_core/ir/model.py
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -110,12 +111,15 @@ class IRIndex:
     Keep them stable + deterministic (preserve traversal/outliner order).
     """
 
+    node_id_by_blender_ptr: dict[int, int] = field(default_factory=dict)  # blender_ref ptr -> node_id
+
     merge_children_roots: list[int] = field(default_factory=list)  # node ids
     merge_group_nodes_by_index: dict[int, list[int]] = field(default_factory=dict)  # mg_index -> [node ids]
     skinned_mesh_nodes: list[int] = field(default_factory=list)
 
     # Armature ptr -> {bone_name: bone_node_id} (built in resolve_armatures)
     bone_nodes_by_armature_ptr: dict[int, dict[str, int]] = field(default_factory=dict)
+    armature_nodes: list[int] = field(default_factory=list)  # node ids of armatures
 
 
 @dataclass(slots=True)
@@ -125,6 +129,11 @@ class ExportIR:
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     roots: list[int] = field(default_factory=list)
     index: IRIndex = field(default_factory=IRIndex)
+
+    def _index_node_blender_ref(self, node: SceneNode) -> None:
+        """Index node by its Blender reference pointer (if any)."""
+        if (ptr := _blender_ptr(node.blender_ref)) is not None:
+            self.index.node_id_by_blender_ptr[ptr] = node.id
 
     def iter_nodes(self, *, kind: NodeKind | None = None, emitted_only: bool = False) -> Iterator[SceneNode]:
         for node in self.scene_nodes.values():
@@ -137,6 +146,7 @@ class ExportIR:
     def add_node(self, node: SceneNode, *, parent_id: int | None = None) -> None:
         """Add a pre-created SceneNode into the IR and attach it."""
         self.scene_nodes[node.id] = node
+        self._index_node_blender_ref(node)
         self.attach(node.id, node.parent_id if parent_id is None else parent_id)
 
     def detach(self, node_id: int) -> None:
@@ -172,3 +182,14 @@ class ExportIR:
         """Reparent node to new_parent_id, updating both roots and children lists safely."""
         self.detach(node_id)
         self.attach(node_id, new_parent_id)
+
+
+def _blender_ptr(x: object) -> int | None:
+    """Return the Blender pointer integer for x, or None if not available."""
+    ap = getattr(x, "as_pointer", None)
+    if ap is None:
+        return None
+    try:
+        return int(ap())
+    except Exception:
+        return None

@@ -60,9 +60,12 @@ def resolve_all(ctx: "ExportContext") -> None:
         resolve_material_shading(ctx, m)
     resolve_matrices(ctx)
 
-    kinds = Counter(n.kind for n in ctx.ir.scene_nodes.values())
-    emitted = sum(1 for n in ctx.ir.scene_nodes.values() if n.emit)
-    mapped = sum(1 for n in ctx.ir.scene_nodes.values() if n.i3d_mapping)
+    kinds = Counter()
+    emitted = mapped = 0
+    for n in ctx.ir.iter_nodes(emitted_only=True):
+        kinds[n.kind] += 1
+        emitted += int(n.emit)
+        mapped += int(n.i3d_mapping)
 
     rep.debug(
         "Resolve summary: emitted=%d/%d mapped=%d kinds=%s",

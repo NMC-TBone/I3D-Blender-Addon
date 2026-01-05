@@ -14,7 +14,7 @@ from idprop.types import IDPropertyArray
 
 logger = logging.getLogger(__name__)
 
-BlenderObject = bpy.types.Object | bpy.types.Collection
+BlenderRef = bpy.types.Object | bpy.types.Collection
 
 
 def _is_number(x: object) -> bool:
@@ -145,7 +145,7 @@ def as_export_path(filepath: str) -> Path:
         return target_path  # Happens if on another drive
 
 
-def sort_blender_objects_by_name(objects: list[BlenderObject]) -> list[BlenderObject]:
+def sort_blender_objects_by_name(objects: list[BlenderRef]) -> list[BlenderRef]:
     return sorted(objects, key=lambda x: x.name)
 
 
@@ -159,7 +159,7 @@ with the use of a regex as detailed in this answer on stackoverflow https://stac
 _SPLIT_NUM = re.compile(r"(\d+)")
 
 
-def sort_blender_objects_by_outliner_ordering(objects: list[BlenderObject]) -> list[BlenderObject]:
+def sort_blender_objects_by_outliner_ordering(objects: list[BlenderRef]) -> list[BlenderRef]:
     return sorted(objects, key=lambda s: [int(t) if t.isdigit() else t.lower() for t in _SPLIT_NUM.split(s.name)])
 
 

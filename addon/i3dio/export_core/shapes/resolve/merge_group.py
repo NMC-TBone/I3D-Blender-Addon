@@ -26,13 +26,6 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
         return
 
     scene_groups = ctx.scene.i3dio_merge_groups
-    # find node_id for a specific Blender object
-    by_obj_ptr = {
-        n.blender_ref.as_pointer(): nid
-        for nid, n in ctx.ir.scene_nodes.items()
-        if isinstance(n.blender_ref, bpy.types.Object)
-    }
-
     for mg_index, node_ids in groups.items():
         if not (0 <= mg_index < len(scene_groups)):
             rep.warning(
@@ -61,7 +54,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             )
             continue
 
-        root_node_id = by_obj_ptr.get(root_obj.as_pointer())
+        root_node_id = ctx.ir.index.node_id_by_blender_ptr.get(root_obj.as_pointer())
         if root_node_id is None:
             obj_rep.warning(
                 "MergeGroup %r root %r is not part of the export; it will not be exported. "
@@ -110,11 +103,10 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             if isinstance(ref, bpy.types.Object) and ref.type == "MESH":
                 entry.contributors.append(ShapeContributor(obj=ref, reference_frame=root_frame, bind_index=bind_index))
 
-        bind_node_ids = [ctx.ir.scene_nodes[nid].id for nid in ordered]
         # Mutate IR nodes
         root_node.kind = NodeKind.SHAPE
         root_node.shape_id = entry.id
-        root_node.skin_bind_node_ids = bind_node_ids
+        root_node.skin_bind_node_ids = ordered
 
         for nid in ordered[1:]:  # Member nodes become TransformGroups
             ctx.ir.scene_nodes[nid].kind = NodeKind.TRANSFORM_GROUP
@@ -124,6 +116,6 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             root_obj.name,
             mg_index,
             entry.id,
-            len(bind_node_ids),
+            len(ordered),
             len(entry.contributors),
         )

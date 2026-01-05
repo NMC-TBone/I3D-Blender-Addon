@@ -1,3 +1,4 @@
+# i3dio/export_core/resolve/armatures.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -23,33 +24,18 @@ def resolve_armatures(ctx: "ExportContext") -> None:
     """
     rep = ctx.section("armatures")
 
-    # obj_ptr -> node_id for fast lookup
-    by_obj_ptr = {
-        n.blender_ref.as_pointer(): nid
-        for nid, n in ctx.ir.scene_nodes.items()
-        if isinstance(n.blender_ref, bpy.types.Object)
-    }
-
     # NOTE: We will add nodes to ctx.ir during this pass.
     # Snapshot the armature nodes up-front to avoid mutating the dict while iterating.
-    armature_nodes = list(ctx.ir.iter_nodes(kind=NodeKind.ARMATURE, emitted_only=False))
-
     created_bones = 0
-    for arm_node in armature_nodes:
+    for arm_node in list(ctx.ir.iter_nodes(kind=NodeKind.ARMATURE, emitted_only=False)):
         arm_obj = arm_node.blender_ref
-        if not isinstance(arm_obj, bpy.types.Object) or arm_obj.type != "ARMATURE":
-            continue
 
         # Collapse behavior: armature not emitted, but children still are.
-        try:
-            arm_node.emit = not bool(arm_obj.i3d_attributes.collapse_armature)
-        except Exception:
-            arm_node.emit = True
+        arm_node.emit = not arm_obj.i3d_attributes.collapse_armature
 
         arm_ptr = arm_obj.as_pointer()
         if arm_ptr in ctx.ir.index.bone_nodes_by_armature_ptr:
-            # Already built once.
-            continue
+            continue  # Already built once.
 
         bone_map: dict[str, int] = {}
 
@@ -72,9 +58,10 @@ def resolve_armatures(ctx: "ExportContext") -> None:
                 add_bone(child, node_id)
 
         # Root bones: only those with bone.parent is None.
+
         for bone in arm_obj.data.bones:
             if bone.parent is None:
-                add_bone(bone, by_obj_ptr.get(arm_ptr, arm_node.id))
+                add_bone(bone, arm_node.id)
 
         ctx.ir.index.bone_nodes_by_armature_ptr[arm_ptr] = bone_map
 

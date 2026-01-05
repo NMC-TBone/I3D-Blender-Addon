@@ -5,20 +5,13 @@ from typing import TYPE_CHECKING, Callable, Iterable
 
 import bpy
 
-from ..utility import BlenderObject, sort_blender_objects_by_outliner_ordering
+from ..utility import sort_blender_objects_by_outliner_ordering
 from .ir import NodeKind
 
 if TYPE_CHECKING:
     from .ctx import ExportContext
 
 ChildIter = Callable[[bpy.types.Object], Iterable[bpy.types.Object]]
-
-
-def _is_excluded(obj: bpy.types.Object) -> bool:
-    try:
-        return obj.i3d_attributes.exclude_from_export
-    except Exception:
-        return False
 
 
 def _is_merge_children_root(ctx: ExportContext, obj: bpy.types.Object) -> bool:
@@ -36,7 +29,7 @@ def _merge_group_index(obj: bpy.types.Object) -> int:
 
 def add_object_node(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None) -> int | None:
     """Create the node for an object (no recursion). Returns node_id or None if skipped."""
-    if _is_excluded(obj):
+    if obj.i3d_attributes.exclude_from_export:
         ctx.object_reporter(obj, "traverse").debug("Excluded from export (skip subtree)")
         return None
 
@@ -56,12 +49,11 @@ def _add_object_with_children(
     expand_instance_collections: bool,
 ) -> None:
     if (node_id := add_object_node(ctx, obj, parent_id)) is None:
-        return
-
+        return  # excluded
     if _is_merge_children_root(ctx, obj):
         ctx.ir.index.merge_children_roots.append(node_id)
         ctx.object_reporter(obj, "traverse").debug("MergeChildren root: skipping child traversal")
-        return
+        return  # skip children
     if expand_instance_collections and obj.instance_collection is not None:
         ctx.object_reporter(obj, "traverse").debug("Expanding instance_collection %r", obj.instance_collection.name)
         add_collection(ctx, obj.instance_collection, node_id)
@@ -130,13 +122,10 @@ def add_collection(
     build_from_collection(ctx, collection, node_id)
 
 
-def build_from_roots(ctx: ExportContext, roots: Iterable[BlenderObject]) -> None:
-    """Entry point for a set of root items (Objects and/or Collections)."""
-    for item in roots:
-        if isinstance(item, bpy.types.Collection):
-            add_collection(ctx, item, parent_id=None)
-        else:
-            add_object(ctx, item, parent_id=None)
+def build_from_objects(ctx: ExportContext, objects: Iterable[bpy.types.Object]) -> None:
+    """Entry point for a set of root objects (e.g. active/selected)."""
+    for obj in objects:
+        add_object(ctx, obj, parent_id=None)
 
 
 def build_selected_only(ctx: ExportContext, selected_objs: list[bpy.types.Object]) -> None:

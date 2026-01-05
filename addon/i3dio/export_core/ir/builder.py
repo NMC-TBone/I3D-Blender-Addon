@@ -1,7 +1,10 @@
+# i3dio/export_core/ir/builder.py
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ...utility import BlenderObject
+from ...utility import BlenderRef
 from ..ids import IdKind
 from .model import NodeKind, SceneNode
 
@@ -11,15 +14,9 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class SceneBuilder:
-    ctx: "ExportContext"
+    ctx: ExportContext
 
-    def add_scene_node(
-        self,
-        *,
-        kind: NodeKind,
-        blender_ref: BlenderObject,
-        parent_id: int | None,
-    ) -> int:
+    def add_scene_node(self, *, kind: NodeKind, blender_ref: BlenderRef, parent_id: int | None) -> int:
         """Create a SceneNode in IR and attach it into the tree."""
         node_id = self.ctx.ids.alloc(IdKind.NODE)
         node = SceneNode(

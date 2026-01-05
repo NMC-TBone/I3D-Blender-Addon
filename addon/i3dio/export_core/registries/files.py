@@ -111,7 +111,7 @@ class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
           - file_structure: FLAT | MODHUB | BLENDER
           - overwrite_files: bool
         """
-        i3d_folder = Path(self.ctx.paths["i3d_folder"])
+        i3d_folder = self.ctx.i3d_folder
         write_directory = i3d_folder
         resolved_directory = Path()
 

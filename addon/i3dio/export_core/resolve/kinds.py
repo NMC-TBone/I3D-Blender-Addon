@@ -45,7 +45,7 @@ def resolve_kind_for_node(ctx: ExportContext, node: SceneNode) -> None:
 
     ref = node.blender_ref
     if not isinstance(ref, bpy.types.Object):
-        # Collections and other non-object refs become
+        # Collections and other non-object refs -> TG, collections should already be set to TG at traversal
         node.kind = NodeKind.TRANSFORM_GROUP
         return
 

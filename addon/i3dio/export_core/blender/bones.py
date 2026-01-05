@@ -1,3 +1,4 @@
+# i3dio/export_core/blender/bones.py
 from __future__ import annotations
 
 from dataclasses import dataclass
