@@ -27,7 +27,7 @@ def resolve_armatures(ctx: "ExportContext") -> None:
     # NOTE: We will add nodes to ctx.ir during this pass.
     # Snapshot the armature nodes up-front to avoid mutating the dict while iterating.
     created_bones = 0
-    for arm_node in list(ctx.ir.iter_nodes(kind=NodeKind.ARMATURE, emitted_only=False)):
+    for arm_node in ctx.ir.nodes_snapshot(kind=NodeKind.ARMATURE, emitted_only=False):
         arm_obj = arm_node.blender_ref
 
         # Collapse behavior: armature not emitted, but children still are.

@@ -76,8 +76,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
                 mg_label,
                 code="merge_group_single_bind_node",
             )
-
-        if len(ordered) > MAX_BIND_NODES:
+        elif len(ordered) > MAX_BIND_NODES:
             ctx.object_reporter(root_obj, "merge_group").warning(
                 "MergeGroup %r has %d bind nodes. Recommended maximum is %d; split into multiple MergeGroups.",
                 mg_label,

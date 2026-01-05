@@ -57,12 +57,24 @@ class NodeReference:
     runtime_loaded: bool | None = None
 
 
+class SourceKind(Enum):
+    OBJECT = auto()
+    COLLECTION = auto()
+    BONE_REF = auto()
+    OTHER = auto()
+
+
 @dataclass(slots=True)
 class SceneNode:
     """A node in the export scene graph IR."""
 
     id: int
     name: str
+    # Immutable identity of what this node represents in Blender
+    source_kind: SourceKind
+    source_ptr: int | None  # Blender pointer of source object/collection/bone, if any
+    source_object_type: str | None  # Blender object type string, if applicable
+
     kind: NodeKind
     blender_ref: Any | None
     parent_id: int | None = None
@@ -127,6 +139,7 @@ class ExportIR:
     """Intermediate representation of the export scene graph."""
 
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
+    node_order: list[int] = field(default_factory=list)  # node ids in creation order (stable)
     roots: list[int] = field(default_factory=list)
     index: IRIndex = field(default_factory=IRIndex)
 
@@ -135,19 +148,25 @@ class ExportIR:
         if (ptr := _blender_ptr(node.blender_ref)) is not None:
             self.index.node_id_by_blender_ptr[ptr] = node.id
 
+    def add_node(self, node: SceneNode, *, parent_id: int | None = None) -> None:
+        """Add a pre-created SceneNode into the IR and attach it."""
+        self.scene_nodes[node.id] = node
+        self.node_order.append(node.id)
+        self._index_node_blender_ref(node)
+        self.attach(node.id, node.parent_id if parent_id is None else parent_id)
+
     def iter_nodes(self, *, kind: NodeKind | None = None, emitted_only: bool = False) -> Iterator[SceneNode]:
-        for node in self.scene_nodes.values():
+        scene_nodes = self.scene_nodes
+        for node_id in self.node_order:
+            node = scene_nodes[node_id]
             if kind is not None and node.kind != kind:
                 continue
             if emitted_only and not node.emit:
                 continue
             yield node
 
-    def add_node(self, node: SceneNode, *, parent_id: int | None = None) -> None:
-        """Add a pre-created SceneNode into the IR and attach it."""
-        self.scene_nodes[node.id] = node
-        self._index_node_blender_ref(node)
-        self.attach(node.id, node.parent_id if parent_id is None else parent_id)
+    def nodes_snapshot(self, *, kind: NodeKind | None = None, emitted_only: bool = False) -> list[SceneNode]:
+        return list(self.iter_nodes(kind=kind, emitted_only=emitted_only))
 
     def detach(self, node_id: int) -> None:
         """Detach node from its parent (if any)."""
