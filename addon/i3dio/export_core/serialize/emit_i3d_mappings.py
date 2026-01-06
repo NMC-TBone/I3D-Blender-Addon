@@ -96,7 +96,7 @@ def _iter_mapped_entries_preorder(ctx: "ExportContext"):
 def emit_i3d_mappings(ctx: "ExportContext") -> None:
     rep = ctx.section("i3dMappings")
 
-    if not (file_path_raw := ctx.settings.get("i3d_mapping_file_path", "")):
+    if not (file_path_raw := ctx.setting("i3d_mapping_file_path", "")):
         return
 
     file_path = Path(bpy.path.abspath(file_path_raw))

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import bpy
 
 from ... import utility
-from ..ir import EmitAttrs, EmitTag, NodeKind, NodeReference, SceneNode, node_emit_tag
+from ..ir import EmitAttrs, NodeKind, NodeReference, SceneNode
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -110,7 +110,7 @@ def resolve_properties(ctx: "ExportContext", node: SceneNode) -> None:
     _collect_i3d_attributes(ref, node.attrs)
 
     data = getattr(ref, "data", None)
-    if data is not None and node_emit_tag(node) in {EmitTag.SHAPE, EmitTag.LIGHT}:
+    if data is not None and node.kind in {NodeKind.SHAPE, NodeKind.LIGHT}:
         _collect_i3d_attributes(data, node.attrs, ctx=ctx, scene_node=node)
     _resolve_reference_path(ctx, node)
 

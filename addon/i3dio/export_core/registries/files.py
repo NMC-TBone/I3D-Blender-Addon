@@ -95,7 +95,7 @@ class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
             rep.info("Resolved as FS $data path: %s", e.resolved_path)
             return
 
-        if self.ctx.settings.get("copy_files", False):
+        if self.ctx.setting("copy_files", False):
             self._copy_entry(rep, e)
             return
 
@@ -117,7 +117,7 @@ class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
 
         rep.info("File is not an FS builtin and will be copied")
 
-        file_structure = self.ctx.settings.get("file_structure", "MODHUB")
+        file_structure = self.ctx.setting("file_structure", "MODHUB")
 
         match file_structure:
             case "FLAT":
@@ -181,7 +181,7 @@ class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
             rep.debug("Source and destination paths are the same, no need to copy")
             return
 
-        overwrite_files = self.ctx.settings.get("overwrite_files", False)
+        overwrite_files = self.ctx.setting("overwrite_files", False)
         if overwrite_files or not write_path_full.exists():
             write_directory.mkdir(parents=True, exist_ok=True)
             try:

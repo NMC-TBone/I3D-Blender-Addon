@@ -64,7 +64,7 @@ def _build_ir(ctx: ExportContext, *, context: bpy.types.Context) -> None:
             if not context.selected_objects:
                 reporter.fail("No objects selected for export")
             reporter.info("Exporting %d selected objects", len(context.selected_objects))
-            if ctx.settings.get("selection_traverse_children", False):
+            if ctx.setting("selection_traverse_children", False):
                 traverse.build_from_objects(ctx, context.selected_objects)
             else:
                 traverse.build_selected_only(ctx, context.selected_objects)

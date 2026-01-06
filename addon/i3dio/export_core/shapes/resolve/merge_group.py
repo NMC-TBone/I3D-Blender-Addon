@@ -54,7 +54,8 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             )
             continue
 
-        root_node_id = ctx.ir.index.node_id_by_blender_ptr.get(root_obj.as_pointer())
+        ids = ctx.ir.index.node_id_by_blender_ptr.get(root_obj.as_pointer(), [])
+        root_node_id = next((nid for nid in ids if nid in node_ids), ids[0] if ids else None)
         if root_node_id is None:
             obj_rep.warning(
                 "MergeGroup %r root %r is not part of the export; it will not be exported. "
@@ -64,6 +65,12 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
                 code="merge_group_root_not_exported",
             )
             continue
+        if len(ids) > 1:
+            obj_rep.warning(
+                "MergeGroup root %r appears multiple times in export graph; using nodeId=%d",
+                root_obj.name,
+                root_node_id,
+            )
 
         root_node = ctx.ir.scene_nodes[root_node_id]
 

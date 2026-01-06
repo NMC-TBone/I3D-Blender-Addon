@@ -44,7 +44,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         return built
 
     def get_or_add_mesh(self, obj: bpy.types.Object) -> int:
-        apply_modifiers = self.ctx.settings.get("apply_modifiers", True)
+        apply_modifiers = self.ctx.setting("apply_modifiers", True)
         mesh = obj.data
 
         # Modifiers live on the object. If we are applying modifiers, only shapes
@@ -79,7 +79,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
             kind="IndexedTriangleSet",
             data_ptr=0,
             object_ptr=root_obj.as_pointer(),
-            apply_modifiers=self.ctx.settings.get("apply_modifiers", True),
+            apply_modifiers=self.ctx.setting("apply_modifiers", True),
             variant=variant,
             merge_group_index=merge_group_index,
         )

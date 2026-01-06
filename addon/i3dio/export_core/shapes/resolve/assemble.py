@@ -4,8 +4,6 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-import bpy
-
 from ...ir import NodeKind, SceneNode, clear_shape_binding, to_transform_group
 from ..its import MaterialKeyKind
 from ..its.material_resolve import resolve_slots
@@ -104,13 +102,9 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
 
         # NORMAL shapes: built.material_ids stores material slot indices in subset order.
         for n in nodes:
-            ref = n.blender_ref
-            if not isinstance(ref, bpy.types.Object) or not isinstance(ref.data, bpy.types.Mesh):
-                n.material_ids = None
-                continue
-
+            obj = n.obj
             slot_materials = (
-                [s.material for s in ref.material_slots] if ref.material_slots else list(ref.data.materials)
+                [s.material for s in obj.material_slots] if obj.material_slots else list(obj.data.materials)
             )
             res = resolve_slots(ctx, slot_materials=slot_materials)
             default_id = ctx.materials.get_default_id()

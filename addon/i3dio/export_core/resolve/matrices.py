@@ -95,7 +95,7 @@ def _local_matrix_export_cached(
 
         # Case 2: non-collapsed armature.
         # The bone is parented to the armature node in XML, so this local matrix is ready as-is.
-        if parent is not None and parent.kind == NodeKind.ARMATURE:
+        if parent is not None and parent.source_object_type == 'ARMATURE':
             return bone_in_arm_export
 
         # Case 3: collapsed armature (or the bone node is effectively reparented).

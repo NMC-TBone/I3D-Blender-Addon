@@ -53,7 +53,7 @@ def extract_contrib_its(
 
         # ---- uvs (0..4) ----
         uv_layers = list(mesh.uv_layers)
-        if ctx.settings.get("alphabetic_uvs", False):
+        if ctx.setting("alphabetic_uvs", False):
             uv_layers.sort(key=lambda ul: ul.name.casefold())
         uv_layers = uv_layers[:MAX_UV_LAYERS]
 
@@ -228,7 +228,7 @@ def extract_contrib_its(
 
 
 def _effective_color_export_mode(ctx: "ExportContext", src_mesh: bpy.types.Mesh) -> str:
-    override = ctx.settings.get("vertex_color_override", "USE_MESH")
+    override = ctx.setting("vertex_color_override", "USE_MESH")
     if override == "FORCE_AUTO":
         return "AUTO"
     if override == "FORCE_IF_PRESENT":

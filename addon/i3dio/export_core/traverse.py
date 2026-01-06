@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Callable, Iterable
 import bpy
 
 from ..utility import sort_blender_objects_by_outliner_ordering
-from .ir import NodeKind
 
 if TYPE_CHECKING:
     from .ctx import ExportContext
@@ -14,30 +13,12 @@ if TYPE_CHECKING:
 ChildIter = Callable[[bpy.types.Object], Iterable[bpy.types.Object]]
 
 
-def _is_merge_children_root(ctx: ExportContext, obj: bpy.types.Object) -> bool:
-    if obj.type != 'MESH':
-        return False
-    mc = getattr(obj, "i3d_merge_children", None)
-    if not mc or not getattr(mc, "enabled", False):
-        return False
-    return "MERGE_CHILDREN" in ctx.settings.get("features_to_export", [])
-
-
-def _merge_group_index(obj: bpy.types.Object) -> int:
-    return int(getattr(obj, "i3d_merge_group_index", -1))
-
-
 def add_object_node(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None) -> int | None:
     """Create the node for an object (no recursion). Returns node_id or None if skipped."""
     if obj.i3d_attributes.exclude_from_export:
         ctx.object_reporter(obj, "traverse").debug("Excluded from export (skip subtree)")
         return None
-
-    return ctx.builder.add_scene_node(
-        kind=NodeKind.UNRESOLVED,  # resolved later
-        blender_ref=obj,
-        parent_id=parent_id,
-    )
+    return ctx.builder.add_object(obj=obj, parent_id=parent_id)
 
 
 def _add_object_with_children(
@@ -50,17 +31,21 @@ def _add_object_with_children(
 ) -> None:
     if (node_id := add_object_node(ctx, obj, parent_id)) is None:
         return  # excluded
-    if _is_merge_children_root(ctx, obj):
+    obj_type = obj.type
+    rep = ctx.object_reporter(obj, "traverse")
+    if obj_type == 'MESH' and obj.i3d_merge_children.enabled and ctx.has_feature("MERGE_CHILDREN"):
         ctx.ir.index.merge_children_roots.append(node_id)
-        ctx.object_reporter(obj, "traverse").debug("MergeChildren root: skipping child traversal")
+        rep.debug("MergeChildren root: skipping child traversal")
         return  # skip children
+
     if expand_instance_collections and obj.instance_collection is not None:
-        ctx.object_reporter(obj, "traverse").debug("Expanding instance_collection %r", obj.instance_collection.name)
+        rep.debug("Expanding instance_collection %r", obj.instance_collection.name)
         add_collection(ctx, obj.instance_collection, node_id)
         return
-    if (mg := _merge_group_index(obj)) >= 0:
+
+    if obj_type == 'MESH' and (mg := obj.i3d_merge_group_index) >= 0 and ctx.has_feature("MERGE_CHILDREN"):
         ctx.ir.index.merge_group_nodes_by_index.setdefault(mg, []).append(node_id)
-        ctx.object_reporter(obj, "traverse").debug("Added to MergeGroup %d", mg)
+        rep.debug("Added to MergeGroup %d", mg)
 
     for child in child_iter(obj):
         _add_object_with_children(
@@ -110,15 +95,10 @@ def add_collection(
 
     emit_self controls whether to create a node for the collection itself (e.g. we don't want Scene Collection with ALL)
     """
-    if not emit_self or not ctx.settings.get("keep_collections_as_transformgroups", False):
+    if not emit_self or not ctx.setting("keep_collections_as_transformgroups", False):
         build_from_collection(ctx, collection, parent_id)
         return
-
-    node_id = ctx.builder.add_scene_node(
-        kind=NodeKind.TRANSFORM_GROUP,
-        blender_ref=collection,
-        parent_id=parent_id,
-    )
+    node_id = ctx.builder.add_collection(collection=collection, parent_id=parent_id)
     build_from_collection(ctx, collection, node_id)
 
 

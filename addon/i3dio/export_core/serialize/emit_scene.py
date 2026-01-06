@@ -8,7 +8,7 @@ import mathutils
 
 from ... import xml_i3d
 from ...utility import isclose_any
-from ..ir import SceneNode, node_emit_tag
+from ..ir import SceneNode
 from .xml_attrs import write_child_elements, write_node_attributes
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
                 emit_node(child_id, parent_elem)
             return
 
-        elem = xml_i3d.SubElement(parent_elem, node_emit_tag(node).value, {"name": node.name, "nodeId": str(node.id)})
+        elem = xml_i3d.SubElement(parent_elem, node.kind.value, {"name": node.name, "nodeId": str(node.id)})
         write_node_attributes(
             elem=elem,
             emit_attrs=node.attrs,

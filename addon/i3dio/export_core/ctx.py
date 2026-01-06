@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, TypeVar
 
 import bpy
 import mathutils
@@ -18,6 +18,8 @@ from .registries.materials import MaterialTable
 from .registries.shapes import ShapeTable
 from .reporting import Reporter
 
+T = TypeVar("T")
+
 
 @dataclass(slots=True)
 class ExportContext:
@@ -28,7 +30,9 @@ class ExportContext:
     depsgraph: bpy.types.Depsgraph
     scene: bpy.types.Scene
     conversion_matrix: mathutils.Matrix
-    settings: dict
+    settings: Mapping[str, Any]
+
+    features: frozenset[str] = field(init=False, repr=False)
 
     conversion_matrix_inv: mathutils.Matrix = field(init=False)
     builder: SceneBuilder = field(init=False)
@@ -43,6 +47,17 @@ class ExportContext:
 
     unit_scale: float = 1.0
     addon_pref: bpy.types.AddonPreferences | None = None
+
+    def init_settings_cache(self) -> None:
+        self.features = frozenset(self.settings.get("features_to_export", ()))
+
+    def setting(self, key: str, default: T) -> T:
+        """Return the setting value for key, or default if not set."""
+        return self.settings.get(key, default)
+
+    def has_feature(self, feature: str) -> bool:
+        """Return True if the given feature is enabled for export."""
+        return feature in self.features
 
     @classmethod
     def create(

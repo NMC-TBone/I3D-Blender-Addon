@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def finalize_name_for_node(ctx: "ExportContext", node: SceneNode) -> None:
-    if not (sep := ctx.settings.get("object_sorting_prefix", ":")) or not node.name:
+    if not (sep := ctx.setting("object_sorting_prefix", ":")) or not node.name:
         return
     before = node.name
     after = strip_sorting_prefix(before, sep)
