@@ -61,9 +61,9 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
         write_node_attributes(
             elem=elem,
             emit_attrs=node.attrs,
-            material_ids=node.material_ids,
-            skin_bind_node_ids=node.skin_bind_node_ids,
-            reference=node.reference,
+            material_ids=node.shape.material_ids,
+            skin_bind_node_ids=node.shape.skin_bind_node_ids,
+            reference=node.tg.reference,
         )
         write_child_elements(parent_elem=elem, emit_attrs=node.attrs)
 

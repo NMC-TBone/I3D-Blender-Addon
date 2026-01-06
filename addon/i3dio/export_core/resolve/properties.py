@@ -150,22 +150,22 @@ def _collect_camera_builtin(cam: bpy.types.Camera, out: dict[str, Any]) -> None:
 
 def _resolve_reference_path(ctx: "ExportContext", node: SceneNode) -> None:
     # Only TransformGroups should carry reference info
-    ref = node.blender_ref
-    if node.kind != NodeKind.TRANSFORM_GROUP or not isinstance(ref, bpy.types.Object):
+    if node.source_object_type != "EMPTY":
         return
-    if not (reference_path := ref.i3d_reference.path):
+    obj = node.obj
+    if not (reference_path := obj.i3d_reference.path):
         return  # no reference set
 
     if not reference_path.lower().endswith(".i3d"):
         ctx.node_reporter(node, "properties").warning("Reference path does not end with '.i3d': %r", reference_path)
         return
+    node.kind = NodeKind.REFERENCE_NODE
+    node.tg.reference = NodeReference(id=ctx.files.add_reference(reference_path))
+    if not obj.i3d_reference.runtime_loaded:
+        node.tg.reference.runtime_loaded = False  # default is True, only write when False
 
-    node.reference = NodeReference(id=ctx.files.add_reference(reference_path))
-    if not ref.i3d_reference.runtime_loaded:
-        node.reference.runtime_loaded = False  # default is True, only write when False
-
-    if child_path := ref.i3d_reference.child_path.strip():
-        node.reference.child_path = child_path
+    if child_path := obj.i3d_reference.child_path.strip():
+        node.tg.reference.child_path = child_path
 
 
 # Collection / routing

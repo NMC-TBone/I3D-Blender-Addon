@@ -5,9 +5,9 @@ from .model import NodeKind, SceneNode
 
 
 def clear_shape_binding(node: SceneNode) -> None:
-    node.shape_id = None
-    node.material_ids = None
-    node.skin_bind_node_ids = None
+    node.shape.shape_id = None
+    node.shape.material_ids = None
+    node.shape.skin_bind_node_ids = None
 
 
 def to_transform_group(node: SceneNode) -> None:

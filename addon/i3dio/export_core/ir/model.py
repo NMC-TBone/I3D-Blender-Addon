@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 from typing import Any, cast
 
 import bpy
@@ -12,12 +12,13 @@ from mathutils import Matrix
 from ..blender.bones import BoneRef
 
 
-class NodeKind(Enum):
-    UNRESOLVED = "TransformGroup"  # placeholder kind used during traversal
+class NodeKind(StrEnum):
     TRANSFORM_GROUP = "TransformGroup"
+    REFERENCE_NODE = "ReferenceNode"
     SHAPE = "Shape"
     LIGHT = "Light"
     CAMERA = "Camera"
+    UNRESOLVED = "TransformGroup"  # placeholder kind used during traversal
 
 
 @dataclass(slots=True)
@@ -44,6 +45,21 @@ class SourceKind(Enum):
 
 
 @dataclass(slots=True)
+class ShapeCaps:
+    shape_id: int | None = None
+    # For Shapes in the Scene graph, resolved global export material IDs in subset order.
+    # Formatting into the I3D "materialIds" attribute is handled by the serializer.
+    material_ids: list[int] | None = None
+    # For merge groups / skinned meshes: node ids (not shape ids) that provide skin bind transforms.
+    # Formatting into the I3D "skinBindNodeIds" attribute is handled by the serializer.
+    skin_bind_node_ids: list[int] | None = None
+
+
+class TransformGroupCaps:
+    reference: NodeReference | None = None
+
+
+@dataclass(slots=True)
 class SceneNode:
     """A node in the export scene graph IR."""
 
@@ -64,17 +80,8 @@ class SceneNode:
 
     attrs: EmitAttrs = field(default_factory=EmitAttrs)
 
-    # For Shapes in the Scene graph, resolved global export material IDs in subset order.
-    # Formatting into the I3D "materialIds" attribute is handled by the serializer.
-    material_ids: list[int] | None = None
-
-    # For merge groups / skinned meshes: node ids (not shape ids) that provide skin bind transforms.
-    # Formatting into the I3D "skinBindNodeIds" attribute is handled by the serializer.
-    skin_bind_node_ids: list[int] | None = None
-
-    # Optional reference info for TransformGroups.
-    # Formatting into I3D reference attributes is handled by the serializer.
-    reference: "NodeReference" | None = None
+    shape: ShapeCaps = field(default_factory=ShapeCaps)
+    tg: TransformGroupCaps = field(default_factory=TransformGroupCaps)
 
     # i3dMappings export fields
     i3d_mapping: bool = False
@@ -98,26 +105,12 @@ class SceneNode:
             raise RuntimeError(f"Node {self.id} is not a BoneRef node")
         return cast(BoneRef, self.blender_ref)
 
-    @property
-    def shape_id(self) -> int | None:
-        sid = self.attrs.node.get("shapeId")
-        return sid if isinstance(sid, int) else None
-
-    @shape_id.setter
-    def shape_id(self, value: int | None) -> None:
-        if value is None:
-            self.attrs.node.pop("shapeId", None)
-        else:
-            self.attrs.node["shapeId"] = int(value)
-
 
 @dataclass(slots=True)
 class IRIndex:
     """
-    Traversal-produced indices/marks that make resolve passes fast and explicit.
-
-    These are NOT user-facing XML attrs; they are internal lookup tables.
-    Keep them stable + deterministic (preserve traversal/outliner order).
+    Internal lookup tables built during traversal/resolve.
+    Not user-facing XML attrs; keep them stable and deterministic.
     """
 
     node_id_by_blender_ptr: dict[int, list[int]] = field(default_factory=dict)  # blender_ref ptr -> node_id
@@ -126,7 +119,7 @@ class IRIndex:
     merge_group_nodes_by_index: dict[int, list[int]] = field(default_factory=dict)  # mg_index -> [node ids]
     skinned_mesh_nodes: list[int] = field(default_factory=list)
 
-    # Armature ptr -> {bone_name: bone_node_id} (built in resolve_armatures)
+    # Armature object ptr -> {bone_name: bone_node_id} (built in resolve_armatures)
     bone_nodes_by_armature_ptr: dict[int, dict[str, int]] = field(default_factory=dict)
     armature_nodes: list[int] = field(default_factory=list)  # node ids of armatures
 

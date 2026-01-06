@@ -44,7 +44,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             continue
 
         obj_rep = ctx.object_reporter(root_obj, "merge_group")
-        if root_obj.type != "MESH":
+        if root_obj.type != 'MESH':
             obj_rep.warning(
                 "MergeGroup %r root %r must be a Mesh object (got %s); it will not be exported.",
                 mg_label,
@@ -110,9 +110,8 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
                 entry.contributors.append(ShapeContributor(obj=ref, reference_frame=root_frame, bind_index=bind_index))
 
         # Mutate IR nodes
-        root_node.kind = NodeKind.SHAPE
-        root_node.shape_id = entry.id
-        root_node.skin_bind_node_ids = ordered
+        root_node.shape.shape_id = entry.id
+        root_node.shape.skin_bind_node_ids = ordered
 
         for nid in ordered[1:]:  # Member nodes become TransformGroups
             ctx.ir.scene_nodes[nid].kind = NodeKind.TRANSFORM_GROUP

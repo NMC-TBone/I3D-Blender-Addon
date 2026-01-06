@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def _index_emitted_shape_nodes_by_id(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
     shape_nodes_by_id: dict[int, list[SceneNode]] = defaultdict(list)
     for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, emitted_only=True):
-        sid = node.shape_id
+        sid = node.shape.shape_id
         if sid is not None:
             shape_nodes_by_id[sid].append(node)
     return shape_nodes_by_id
@@ -85,18 +85,19 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
         rep.debug("No valid shape nodes; skipping materialIds finalize")
         return
 
+    default_id = ctx.materials.get_default_id()
     wrote_nodes = 0
     for shape_id, nodes in shape_nodes_by_id.items():
         built = ctx.shapes.get_built(shape_id)
         if built is None or not built.material_ids:
             for n in nodes:
-                n.material_ids = None
+                n.shape.material_ids = None
             continue
 
         if built.material_kind == MaterialKeyKind.MATERIAL_ID:
             # Merge shapes: subsets already keyed by resolved global material IDs.
             for n in nodes:
-                n.material_ids = built.material_ids
+                n.shape.material_ids = built.material_ids
                 wrote_nodes += 1
             continue
 
@@ -117,7 +118,7 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
                 else:
                     out_ids.append(int(fallback_id))
 
-            n.material_ids = out_ids
+            n.shape.material_ids = out_ids
             wrote_nodes += 1
 
     rep.debug("Finalized materialIds for %d nodes", wrote_nodes)
