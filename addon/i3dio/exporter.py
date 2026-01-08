@@ -26,11 +26,9 @@ BINARIZER_TIMEOUT_IN_SECONDS = 30
 
 def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axis_forward, axis_up, settings) -> dict:
     export_data: dict = {}
-    debugging.addon_console_handler.setLevel(logging.INFO)
-    if operator.verbose_output:
-        debugging.addon_console_handler.setLevel(logging.DEBUG)
-    else:
-        debugging.addon_console_handler.setLevel(debugging.addon_console_handler_default_level)
+    # Setup logging level based on verbose_output
+    log_level = logging.DEBUG if operator.verbose_output else debugging.addon_console_handler_default_level
+    debugging.addon_console_handler.setLevel(log_level)
 
     log_ctx = nullcontext()
     if operator.log_to_file:
@@ -38,9 +36,9 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
         log_ctx = debugging.export_log_file(filename)
 
     time_start = time.time()
-
-    # Wrap everything in a try/catch to handle addon breaking exceptions and also get them in the log file
     ctx = None
+    success = False
+
     try:
         with log_ctx:
             addon_version = module_bl_info(sys.modules[__package__])["version"]
@@ -48,12 +46,11 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
             logger.info(f"I3D Exporter version is: {addon_version}")
             logger.info(f"Exporting to {filepath}")
 
-            depsgraph = context.evaluated_depsgraph_get()
             ctx = ExportContext.create(
                 is_dev=addon_version == (0, 0, 0),
                 operator=operator,
                 filepath=filepath,
-                depsgraph=depsgraph,
+                depsgraph=context.evaluated_depsgraph_get(),
                 scene=context.scene,
                 conversion_matrix=axis_conversion(to_forward=axis_forward, to_up=axis_up).to_4x4(),
                 settings=settings,
@@ -77,24 +74,19 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
             if operator.binarize_i3d:
                 _binarize_i3d(ctx)
 
-            report_messages_to_operator(ctx, limit=10)
+            success = True
 
-    # Global try/catch exception handler. So that any unspecified exception will still end up in the log file
     except ExportUserError as e:
         logger.warning("Export aborted: %s", e)
-        if ctx is not None:
-            report_messages_to_operator(ctx, limit=10)
-        export_data["success"] = False
     except Exception as e:
         logger.exception("Export crashed due to an unexpected error: %s", e)
-        if ctx is not None:
-            report_messages_to_operator(ctx, limit=10)
-        export_data["success"] = False
         if ctx is not None and ctx.is_dev:
             raise  # In dev mode, re-raise the exception for debugging
-    else:
-        export_data["success"] = True
     finally:
+        # Always report messages if context was created
+        if ctx is not None:
+            report_messages_to_operator(ctx, limit=10)
+        export_data["success"] = success
         export_data["time"] = time.time() - time_start
         logger.info(f"Export took {export_data['time']:.3f} seconds")
         debugging.addon_console_handler.setLevel(debugging.addon_console_handler_default_level)
@@ -104,7 +96,7 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
 
 def _binarize_i3d(ctx: ExportContext) -> None:
     """Tries to binarize the exported I3D file"""
-    rep = ctx.section("binarizer")
+    rep = ctx.reporter("binarizer")
     if not (converter_path := getattr(ctx.addon_pref, "i3d_converter_path", None)):
         rep.error("No i3dConverter path set in preferences. Skipping binarization.")
         return

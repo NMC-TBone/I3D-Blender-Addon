@@ -64,49 +64,45 @@ class SceneNode:
     id: int
     name: str
     kind: NodeKind
-    # Trustworthy identity (set once by builder)
     source_kind: SourceKind
     parent_id: int | None = None
 
-    matrix_local_export: Matrix | None = None  # Computed local transform in EXPORT space (ready for serializer)
-    emit: bool = True  # whether to emit this node (e.g. armature can be collapsed)
+    matrix_local_export: Matrix | None = None
+    emit: bool = True
     attrs: EmitAttrs = field(default_factory=EmitAttrs)
 
     source_ptr: int | None = None
-    source_object_type: str | None = None  # only for OBJECT (snapshot of obj.type)
+    source_object_type: str | None = None
     blender_ref: BlenderRef | None = None
 
-    # Kind-specific extensions (all Scene nodes in i3D is a extension of TransformGroup)
     _shape: ShapeSceneExt | None = None
     _ref: ReferenceNodeExt | None = None
 
+    def _require(self, attr: str, expected_kind: NodeKind | None = None, expected_source: SourceKind | None = None):
+        if expected_kind and self.kind is not expected_kind:
+            raise RuntimeError(f"Node {self.id} (kind={self.kind}) is not a {expected_kind.name}")
+        if expected_source and self.source_kind is not expected_source:
+            raise RuntimeError(f"Node {self.id} is not a {expected_source.name} node")
+        val = getattr(self, attr)
+        if val is None:
+            raise RuntimeError(f"Node {self.id}: {attr} is None (not initialized)")
+        return val
+
     @property
     def shape(self) -> ShapeSceneExt:
-        if self.kind is not NodeKind.SHAPE:
-            raise RuntimeError(f"Node {self.id} (kind={self.kind}) is not a Shape node")
-        if self._shape is None:
-            raise RuntimeError(f"Node {self.id} is a Shape but _shape extension is None (not initialized)")
-        return self._shape
+        return self._require("_shape", expected_kind=NodeKind.SHAPE)
 
     @property
     def ref(self) -> ReferenceNodeExt:
-        if self.kind is not NodeKind.REFERENCE_NODE:
-            raise RuntimeError(f"Node {self.id} (kind={self.kind}) is not a Reference node")
-        if self._ref is None:
-            raise RuntimeError(f"Node {self.id} is a ReferenceNode but _ref extension is None (not initialized)")
-        return self._ref
+        return self._require("_ref", expected_kind=NodeKind.REFERENCE_NODE)
 
     @property
     def obj(self) -> bpy.types.Object:
-        if self.source_kind is not SourceKind.OBJECT:
-            raise RuntimeError(f"Node {self.id} is not an Object node")
-        return cast(bpy.types.Object, self.blender_ref)
+        return cast(bpy.types.Object, self._require("blender_ref", expected_source=SourceKind.OBJECT))
 
     @property
     def bone_ref(self) -> BoneRef:
-        if self.source_kind is not SourceKind.BONE_REF:
-            raise RuntimeError(f"Node {self.id} is not a BoneRef node")
-        return cast(BoneRef, self.blender_ref)
+        return cast(BoneRef, self._require("blender_ref", expected_source=SourceKind.BONE_REF))
 
 
 @dataclass(slots=True)
@@ -156,37 +152,37 @@ class ExportIR:
         if (ptr := node.source_ptr) is not None:
             self.index.node_id_by_blender_ptr.setdefault(ptr, []).append(node.id)
 
+    def _invalidate_caches(self) -> None:
+        self._roots_cache.clear()
+        self._children_cache.clear()
+
     def add_node(self, node: SceneNode, *, parent_id: int | None = None) -> None:
         """Add a pre-created SceneNode into the IR and attach it."""
         self.scene_nodes[node.id] = node
         self.node_order.append(node.id)
         self._index_node_blender_ref(node)
-        # Override node's parent_id if parent_id parameter is provided
         if parent_id is not None:
             node.parent_id = parent_id
-        self._roots_cache.clear()  # invalidate roots cache
-        self._children_cache.clear()  # invalidate children cache
+        self._invalidate_caches()
 
     def _ensure_hierarchy(self) -> None:
         """Build hierarchy caches from parent_id relationships (internal use only)."""
         if self._children_cache and self._roots_cache:
-            return  # already built
-        self._children_cache.clear()
-        self._roots_cache.clear()
+            return
+        self._invalidate_caches()
         for node in self.scene_nodes.values():
             self._children_cache.setdefault(node.id, [])
-            if node.parent_id is None:
+            pid = node.parent_id
+            if pid is None:
                 self._roots_cache.append(node.id)
-                # Also add roots to cache under None key for emitted_child_ids(None)
                 self._children_cache.setdefault(None, []).append(node.id)
-            elif node.parent_id in self.scene_nodes:
-                self._children_cache.setdefault(node.parent_id, []).append(node.id)
+            elif pid in self.scene_nodes:
+                self._children_cache.setdefault(pid, []).append(node.id)
 
     def iter_roots(self) -> Iterator[SceneNode]:
         """Iterate over root nodes (those with parent_id=None)."""
         self._ensure_hierarchy()
-        for root_id in self._roots_cache:
-            yield self.scene_nodes[root_id]
+        return (self.scene_nodes[rid] for rid in self._roots_cache)
 
     def iter_nodes(
         self,
@@ -208,55 +204,26 @@ class ExportIR:
                 continue
             yield n
 
-    def iter_objects(self, *, obj_type: str | None = None, emitted_only: bool = False) -> Iterator[SceneNode]:
-        """Convenience method to iterate over OBJECT source nodes."""
-        return self.iter_nodes(source_kind=SourceKind.OBJECT, source_object_type=obj_type, emitted_only=emitted_only)
-
     def children_ids(self, parent_id: int) -> list[int]:
         """Get direct child node IDs for a given parent (no emit filtering)."""
         self._ensure_hierarchy()
         return self._children_cache.get(parent_id, [])
 
     def emitted_child_ids(self, node_id: int | None) -> list[int]:
-        """Get child node IDs that should be emitted, flattening emit=False nodes.
-
-        This matches serializer behavior: nodes with emit=False are transparent,
-        and their emitted children appear at the parent's level instead.
-
-        Args:
-            node_id: Parent node ID, or None for roots
-
-        Returns:
-            List of node IDs that should be emitted as children
-        """
+        """Get child IDs to emit, flattening emit=False nodes recursively."""
         self._ensure_hierarchy()
-        children = self._children_cache.get(node_id, [])
         result: list[int] = []
-        for cid in children:
+        for cid in self._children_cache.get(node_id, []):
             if self.scene_nodes[cid].emit:
                 result.append(cid)
             else:
-                # Flatten: include this node's emitted children instead
                 result.extend(self.emitted_child_ids(cid))
         return result
 
     def attach(self, node_id: int, parent_id: int | None) -> None:
-        """Change a node's parent (reparent operation).
-
-        This is the primary method for modifying hierarchy during resolve phases.
-
-        Common use cases:
-        - Reparenting bones with "Child Of" constraints to their constraint targets
-        - Collapsing armatures (bones become children of armature's parent)
-        - Restructuring hierarchy based on export settings
-
-        Args:
-            node_id: Node to reparent
-            parent_id: New parent ID, or None to make it a root node
-        """
+        """Change a node's parent (reparent operation)."""
         n = self.scene_nodes[node_id]
         if n.parent_id == parent_id:
-            return  # already attached correctly
+            return
         n.parent_id = parent_id
-        self._roots_cache.clear()
-        self._children_cache.clear()
+        self._invalidate_caches()

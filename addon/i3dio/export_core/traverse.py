@@ -57,14 +57,14 @@ def _add_object_with_children(
         )
 
 
+def _default_child_iter(obj: bpy.types.Object) -> Iterable[bpy.types.Object]:
+    """Default child iterator for standard object traversal."""
+    return sort_blender_objects_by_outliner_ordering(obj.children)
+
+
 def add_object(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None) -> None:
-    _add_object_with_children(
-        ctx,
-        obj,
-        parent_id,
-        child_iter=lambda o: sort_blender_objects_by_outliner_ordering(o.children),
-        expand_instance_collections=True,
-    )
+    """Add a single object and its children to the IR."""
+    _add_object_with_children(ctx, obj, parent_id, child_iter=_default_child_iter, expand_instance_collections=True)
 
 
 def build_from_collection(ctx: ExportContext, collection: bpy.types.Collection, parent_id: int | None) -> None:

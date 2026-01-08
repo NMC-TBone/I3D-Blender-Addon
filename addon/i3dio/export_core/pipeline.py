@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 def run_export(ctx: ExportContext, *, context: bpy.types.Context) -> None:
     """Run the export pipeline to export the Blender scene to an I3D file."""
-    rep = ctx.section("pipeline")
+    rep = ctx.reporter("pipeline")
     rep.debug("Traverse start")
     _build_ir(ctx, context=context)
     rep.debug("Traverse done (nodes=%d roots=%d)", len(ctx.ir.scene_nodes), sum(1 for _ in ctx.ir.iter_roots()))
@@ -36,7 +36,7 @@ def run_export(ctx: ExportContext, *, context: bpy.types.Context) -> None:
 
 def _build_ir(ctx: ExportContext, *, context: bpy.types.Context) -> None:
     op = ctx.operator
-    reporter = ctx.section("pipeline")
+    reporter = ctx.reporter("pipeline")
     source_collection = None
     if getattr(op, "collection", None):
         source_collection = bpy.data.collections.get(op.collection)

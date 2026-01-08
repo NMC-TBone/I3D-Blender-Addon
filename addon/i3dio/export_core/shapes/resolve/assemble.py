@@ -32,7 +32,7 @@ def resolve_shapes_build(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
         - Invalid shapes are converted to TransformGroup (nodes mutated).
         - Built geometry is cached in ctx.shapes.built_by_id via ctx.shapes.get_built().
     """
-    rep = ctx.section("shapes")
+    rep = ctx.reporter("shapes")
 
     # Map shapeId -> [node]
     shape_nodes_by_id = _index_emitted_shape_nodes_by_id(ctx)
@@ -74,7 +74,7 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
       - clearing stale shape bindings on non-shape nodes
       - writing materialIds on shape nodes (per-node for NORMAL, shared for merge modes)
     """
-    rep = ctx.section("shapes")
+    rep = ctx.reporter("shapes")
 
     # Safety invariant: non-shape nodes must not carry shape bindings
     for node in ctx.ir.iter_nodes(emitted_only=True):

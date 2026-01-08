@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..blender.bones import BoneRef
+from ..ir import SourceKind
 
 if TYPE_CHECKING:
     import bpy
@@ -13,10 +14,10 @@ if TYPE_CHECKING:
 
 def resolve_armatures(ctx: "ExportContext") -> None:
     """Build bone nodes for armatures and cache bone-name->node-id mappings."""
-    rep = ctx.section("armatures")
+    rep = ctx.reporter("armatures")
 
     created_bones = 0
-    for arm_node in ctx.ir.iter_objects(obj_type='ARMATURE'):
+    for arm_node in ctx.ir.iter_nodes(source_kind=SourceKind.OBJECT, source_object_type='ARMATURE'):
         arm_obj = arm_node.blender_ref
 
         # Collapse armature: don't emit the armature node, but still emit its bone children.

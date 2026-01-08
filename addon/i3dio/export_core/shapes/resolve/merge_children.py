@@ -40,7 +40,7 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
         apply_transforms=True  -> root frame
         apply_transforms=False -> top-level child frame
     """
-    rep = ctx.section("merge_children")
+    rep = ctx.reporter("merge_children")
 
     for root_id in ctx.ir.index.merge_children_roots:
         node = ctx.ir.scene_nodes[root_id]

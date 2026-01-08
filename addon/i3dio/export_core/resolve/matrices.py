@@ -136,7 +136,7 @@ def _local_matrix_export_cached(
 
 def resolve_matrices(ctx: "ExportContext") -> None:
     """Compute local EXPORT-space matrices for all nodes and store them on the node."""
-    rep = ctx.section("matrices")
+    rep = ctx.reporter("matrices")
     rep.debug("Matrix resolve start")
 
     world_cache: dict[int, mathutils.Matrix | None] = {}

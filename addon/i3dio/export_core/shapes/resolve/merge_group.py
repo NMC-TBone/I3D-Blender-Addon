@@ -18,7 +18,7 @@ MAX_BIND_NODES = 256  # total bind nodes (including root)
 
 
 def resolve_merge_groups(ctx: ExportContext) -> None:
-    rep = ctx.section("merge_group")
+    rep = ctx.reporter("merge_group")
 
     groups = ctx.ir.index.merge_group_nodes_by_index
     if not groups:

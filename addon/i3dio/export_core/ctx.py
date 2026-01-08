@@ -101,43 +101,25 @@ class ExportContext:
         node_id: int | None = None,
         prefix: str | None = None,
     ) -> logging.LoggerAdapter:
-        # normalize prefix formatting once
-        p = ""
-        if prefix:
-            p = prefix if prefix.endswith(": ") else prefix + ": "
+        p = (prefix if prefix and prefix.endswith(": ") else f"{prefix}: ") if prefix else ""
         return debugging.ContextAdapter(
             self.logger(name),
-            {
-                "object_name": object_name,
-                "node_kind": node_kind,
-                "node_id": node_id,
-                "prefix": p,
-            },
+            {"object_name": object_name, "node_kind": node_kind, "node_id": node_id, "prefix": p},
         )
 
     def node_logger(self, node: SceneNode, *, name: str = "export", prefix: str | None = None) -> logging.LoggerAdapter:
         return self.ctx_logger(
-            name=name,
-            object_name=node.name,
-            node_kind=node.kind.name,
-            node_id=node.id,
-            prefix=prefix,
+            name=name, object_name=node.name, node_kind=node.kind.name, node_id=node.id, prefix=prefix
         )
 
     def reporter(self, prefix: str | None = None, *, name: str = "export") -> Reporter:
-        log = self.ctx_logger(name=name, prefix=prefix)
-        return Reporter(self, log, operator=self.operator)
+        return Reporter(self, self.ctx_logger(name=name, prefix=prefix), operator=self.operator)
 
     def node_reporter(self, node: SceneNode, prefix: str | None = None, *, name: str = "export") -> Reporter:
-        log = self.node_logger(node, name=name, prefix=prefix)
-        return Reporter(self, log, operator=self.operator)
-
-    def section(self, prefix: str, *, name: str = "export") -> Reporter:
-        return self.reporter(prefix=prefix, name=name)
+        return Reporter(self, self.node_logger(node, name=name, prefix=prefix), operator=self.operator)
 
     def object_reporter(self, obj: bpy.types.ID, prefix: str | None = None, *, name: str = "export") -> Reporter:
-        log = self.ctx_logger(name=name, object_name=getattr(obj, "name", "?"), prefix=prefix)
-        return Reporter(self, log, operator=self.operator)
+        return Reporter(self, self.ctx_logger(name=name, object_name=getattr(obj, "name", "?")), self.operator)
 
     def logger(self, name: str = "export") -> logging.Logger:
         return debugging.get_logger(name)

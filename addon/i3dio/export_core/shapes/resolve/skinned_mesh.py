@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def resolve_skinned_meshes(ctx: ExportContext) -> None:
-    rep = ctx.section("skinned_mesh")
+    rep = ctx.reporter("skinned_mesh")
 
     # Find bone nodes produced by resolve_armatures.
     bones_by_arm_ptr = ctx.ir.index.bone_nodes_by_armature_ptr

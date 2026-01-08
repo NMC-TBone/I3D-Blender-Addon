@@ -79,7 +79,7 @@ class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
         This is the new equivalent of each File node resolving itself during
         construction in the old Node hierarchy.
         """
-        rep = self.ctx.section("files")
+        rep = self.ctx.reporter("files")
         rep.info("Finalizing %d registered files", len(self._entries))
         for e in self._entries.values():
             self._resolve_entry(rep, e)

@@ -16,17 +16,14 @@ if TYPE_CHECKING:
 class Reporter:
     ctx: ExportContext
     log: logging.Logger
-    operator: Any | None = None  # Blender operator, optional, will make reports appear in UI directly
+    operator: Any | None = None
 
     def _default_object_name(self) -> str | None:
-        extra = getattr(self.log, "extra", None)  # works for LoggerAdapter
-        if isinstance(extra, dict):
-            return extra.get("object_name")
-        return None
+        extra = getattr(self.log, "extra", None)
+        return extra.get("object_name") if isinstance(extra, dict) else None
 
     @staticmethod
     def _msg_text(msg: str, args: tuple[object, ...]) -> str:
-        # Keep current style: only %-format when args are present
         return (msg % args) if args else msg
 
     def info(self, msg: str, *args, stacklevel: int = 2) -> None:
@@ -34,6 +31,26 @@ class Reporter:
 
     def debug(self, msg: str, *args, stacklevel: int = 2) -> None:
         self.log.debug(msg, *args, stacklevel=stacklevel)
+
+    def _log_and_record(
+        self,
+        level: str,
+        msg: str,
+        args: tuple,
+        *,
+        object_name: str | None,
+        code: str | None,
+        report: bool,
+        stacklevel: int,
+    ) -> str:
+        """Common logic for warning/error: log, record message, optionally report to operator."""
+        getattr(self.log, level)(msg, *args, stacklevel=stacklevel + 1)
+        text = self._msg_text(msg, args)
+        obj = object_name or self._default_object_name()
+        getattr(self.ctx.messages, level)(text, object_name=obj, code=code)
+        if report and self.operator:
+            self.operator.report({level.upper()}, text)
+        return text
 
     def warning(
         self,
@@ -44,12 +61,9 @@ class Reporter:
         report: bool = False,
         stacklevel: int = 2,
     ) -> None:
-        self.log.warning(msg, *args, stacklevel=stacklevel)
-        text = self._msg_text(msg, args)
-        obj = object_name or self._default_object_name()
-        self.ctx.messages.warning(text, object_name=obj, code=code)
-        if report and self.operator:
-            self.operator.report({"WARNING"}, text)
+        self._log_and_record(
+            "warning", msg, args, object_name=object_name, code=code, report=report, stacklevel=stacklevel
+        )
 
     def error(
         self,
@@ -60,12 +74,9 @@ class Reporter:
         report: bool = False,
         stacklevel: int = 2,
     ) -> None:
-        self.log.error(msg, *args, stacklevel=stacklevel)
-        text = self._msg_text(msg, args)
-        obj = object_name or self._default_object_name()
-        self.ctx.messages.error(text, object_name=obj, code=code)
-        if report and self.operator:
-            self.operator.report({"ERROR"}, text)
+        self._log_and_record(
+            "error", msg, args, object_name=object_name, code=code, report=report, stacklevel=stacklevel
+        )
 
     def exception(
         self,
@@ -79,73 +90,46 @@ class Reporter:
         self.log.exception(msg, *args, stacklevel=stacklevel)
         text = self._msg_text(msg, args)
         obj = object_name or self._default_object_name()
-        if severity is Severity.ERROR:
-            self.ctx.messages.error(text, object_name=obj, code=code)
-        else:
-            self.ctx.messages.warning(text, object_name=obj, code=code)
+        record = self.ctx.messages.error if severity is Severity.ERROR else self.ctx.messages.warning
+        record(text, object_name=obj, code=code)
 
     def fail(
-        self,
-        msg: str,
-        *args,
-        object_name: str | None = None,
-        code: str | None = None,
-        report: bool = True,
+        self, msg: str, *args, object_name: str | None = None, code: str | None = None, report: bool = True
     ) -> None:
-        # one call: log + messages + optional operator.report + raise
-        self.error(msg, *args, object_name=object_name, code=code, report=report)
-        raise ExportUserError(self._msg_text(msg, args))
+        """Log error, record message, optionally report to operator, and raise ExportUserError."""
+        text = self._log_and_record("error", msg, args, object_name=object_name, code=code, report=report, stacklevel=2)
+        raise ExportUserError(text)
+
+
+def _fmt_message(m: ExportMessage) -> str:
+    return f"[{m.object_name}] {m.text}" if m.object_name else m.text
 
 
 def report_messages_to_operator(ctx: ExportContext, *, limit: int = 10, code_summary_limit: int = 5) -> None:
-    operator = getattr(ctx, "operator", None)
-    if operator is None or limit <= 0:
+    if not (operator := getattr(ctx, "operator", None)) or limit <= 0 or not ctx.messages.items:
         return
 
-    items = ctx.messages.items
-    if not items:
-        return
+    by_severity = {s: [m for m in ctx.messages.items if m.severity is s] for s in Severity}
 
-    errors: list[ExportMessage] = [m for m in items if m.severity is Severity.ERROR]
-    warnings: list[ExportMessage] = [m for m in items if m.severity is Severity.WARNING]
+    # Show errors first, then warnings, up to limit
+    shown: list[ExportMessage] = []
+    for sev in (Severity.ERROR, Severity.WARNING):
+        for m in by_severity[sev]:
+            if len(shown) >= limit:
+                break
+            operator.report({sev.name}, _fmt_message(m))
+            shown.append(m)
 
-    def fmt(m: ExportMessage) -> str:
-        return f"[{m.object_name}] {m.text}" if m.object_name else m.text
-
-    shown = 0
-    shown_ids: set[int] = set()
-
-    for m in errors:
-        if shown >= limit:
-            break
-        operator.report({"ERROR"}, fmt(m))
-        shown_ids.add(id(m))
-        shown += 1
-
-    for m in warnings:
-        if shown >= limit:
-            break
-        operator.report({"WARNING"}, fmt(m))
-        shown_ids.add(id(m))
-        shown += 1
-
-    remaining = [m for m in (errors + warnings) if id(m) not in shown_ids]
+    # Summarize remaining by code
+    remaining = [m for m in by_severity[Severity.ERROR] + by_severity[Severity.WARNING] if m not in shown]
     if not remaining:
         return
 
-    # Group remaining ONLY by code (ignore messages without code for grouping)
-    coded = [m for m in remaining if m.code]
-    # uncoded_count = len(remaining) - len(coded)
-
-    counts = Counter(m.code for m in coded)  # type: ignore[arg-type]
-    # Show biggest repeating codes first
+    counts = Counter(m.code for m in remaining if m.code)
+    accounted = 0
     for code, n in counts.most_common(code_summary_limit):
         operator.report({"WARNING"}, f"...and {n} more: {code} (see export log)")
+        accounted += n
 
-        # Mark these as accounted for in our final hidden count
-        # (we'll subtract them from hidden below)
-    accounted = sum(n for _, n in counts.most_common(code_summary_limit))
-
-    hidden = len(remaining) - accounted
-    if hidden > 0:
+    if (hidden := len(remaining) - accounted) > 0:
         operator.report({"WARNING"}, f"...and {hidden} more messages (see export log).")

@@ -19,9 +19,7 @@ def set_kind(node: SceneNode, kind: NodeKind) -> None:
     """
     if node.kind is kind:
         return
-
     node.kind = kind
-
     match kind:
         case NodeKind.SHAPE:
             node._shape = node._shape or ShapeSceneExt()

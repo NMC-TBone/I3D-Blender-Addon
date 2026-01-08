@@ -35,7 +35,7 @@ def _find_or_insert_i3d_mappings_block(
     Ensure `<i3dMappings> ... </i3dMappings>` exists and return (open_idx, close_idx, base_indent).
     Inserts the block just before the last closing XML tag if missing.
     """
-    rep = ctx.section("i3dMappings")
+    rep = ctx.reporter("i3dMappings")
 
     def _is_closing_tag(line: str) -> bool:
         s = line.strip()
@@ -92,7 +92,7 @@ def _iter_mapped_entries_preorder(ctx: "ExportContext"):
 
 
 def emit_i3d_mappings(ctx: "ExportContext") -> None:
-    rep = ctx.section("i3dMappings")
+    rep = ctx.reporter("i3dMappings")
 
     if not (file_path_raw := ctx.setting("i3d_mapping_file_path", "")):
         return

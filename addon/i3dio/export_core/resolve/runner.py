@@ -28,46 +28,50 @@ def resolve_all(ctx: "ExportContext") -> None:
     """
     Apply IR resolve/finalize passes after traversal and before serialization.
 
-    Node-local passes are run in a single loop for readability and to avoid
-    sprinkling loops throughout the resolver modules.
+    Phases:
+    1. Per-node basics (kind, name) - must run before structural transforms
+    2. Structural transforms (armatures, merge groups, etc.)
+    3. Per-node properties (after structure is stable)
+    4. Shape/material finalization
+    5. Final passes (matrices, mappings)
     """
-    rep = ctx.section("resolve")
+    rep = ctx.reporter("resolve")
     rep.debug("Resolving %d scene nodes", len(ctx.ir.scene_nodes))
 
+    # Phase 1: Node basics (kind & name resolution)
     for node in ctx.ir.scene_nodes.values():
         resolve_kind_for_node(ctx, node)
         finalize_name_for_node(ctx, node)
 
+    # Phase 2: Structural transforms
     resolve_armatures(ctx)
-
     resolve_merge_children(ctx)
     resolve_merge_groups(ctx)
     resolve_skinned_meshes(ctx)
     resolve_shape_links(ctx)
 
+    # Phase 3: Per-node properties (structure is now stable)
     for node in ctx.ir.scene_nodes.values():
         resolve_properties(ctx, node)
 
+    # Phase 4: Shape & material finalization
     valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)
-
     for m in ctx.materials.entries():
         resolve_material_properties(ctx, m)
         resolve_material_shading(ctx, m)
+
+    # Phase 5: Final passes
     resolve_matrices(ctx)
     collect_i3d_mappings(ctx)
+    ctx.files.finalize()
 
-    kinds = Counter()
-    emitted = 0
-    for n in ctx.ir.iter_nodes(emitted_only=True):
-        kinds[n.kind] += 1
-        emitted += int(n.emit)
-
+    # Debug summary
+    kinds = Counter(n.kind for n in ctx.ir.iter_nodes(emitted_only=True))
     rep.debug(
         "Resolve summary: emitted=%d/%d mapped=%d kinds=%s",
-        emitted,
+        sum(kinds.values()),
         len(ctx.ir.scene_nodes),
-        len(ctx.ir.index.mapping_id_by_node_id.keys()),
+        len(ctx.ir.index.mapping_id_by_node_id),
         {k.name: v for k, v in kinds.items()},
     )
-    ctx.files.finalize()
