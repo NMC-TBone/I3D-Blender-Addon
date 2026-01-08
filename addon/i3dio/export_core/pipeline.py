@@ -19,7 +19,7 @@ def run_export(ctx: ExportContext, *, context: bpy.types.Context) -> None:
     rep = ctx.section("pipeline")
     rep.debug("Traverse start")
     _build_ir(ctx, context=context)
-    rep.debug("Traverse done (nodes=%d roots=%d)", len(ctx.ir.scene_nodes), len(ctx.ir.roots))
+    rep.debug("Traverse done (nodes=%d roots=%d)", len(ctx.ir.scene_nodes), sum(1 for _ in ctx.ir.iter_roots()))
 
     rep.debug("Resolve start")
     resolve_all(ctx)

@@ -53,24 +53,19 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
         node = ctx.ir.scene_nodes[node_id]
 
         if not node.emit:
-            for child_id in node.children:
+            for child_id in ctx.ir.emitted_child_ids(node_id):
                 emit_node(child_id, parent_elem)
             return
 
         elem = xml_i3d.SubElement(parent_elem, node.kind.value, {"name": node.name, "nodeId": str(node.id)})
-        write_node_attributes(
-            elem=elem,
-            emit_attrs=node.attrs,
-            material_ids=node.shape.material_ids,
-            skin_bind_node_ids=node.shape.skin_bind_node_ids,
-            reference=node.tg.reference,
-        )
+        write_node_attributes(elem=elem, node=node)
         write_child_elements(parent_elem=elem, emit_attrs=node.attrs)
-
         _write_transform(ctx, elem, node)
 
-        for child_id in node.children:
+        for child_id in ctx.ir.emitted_child_ids(node_id):
             emit_node(child_id, elem)
 
-    for root_id in ctx.ir.roots:
+    ctx.reporter("emit_scene").info("Emitting scene with %d root nodes", len(ctx.ir.emitted_child_ids(None)))
+    for root_id in ctx.ir.emitted_child_ids(None):
+        ctx.node_reporter(ctx.ir.scene_nodes[root_id]).debug("Emitting scene root node")
         emit_node(root_id, scene_elem)

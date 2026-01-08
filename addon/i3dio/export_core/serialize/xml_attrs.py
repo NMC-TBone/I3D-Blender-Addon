@@ -1,10 +1,14 @@
 # i3dio/export_core/serialize/xml_attrs.py
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ... import xml_i3d
-from ..ir import EmitAttrs, NodeReference
+from ..ir import EmitAttrs
+
+if TYPE_CHECKING:
+    from ..ir import SceneNode
 
 
 def write_attributes(elem, attrs: Mapping[str, object]) -> None:
@@ -12,30 +16,30 @@ def write_attributes(elem, attrs: Mapping[str, object]) -> None:
         xml_i3d.write_attribute(elem, k, v)
 
 
-def write_node_attributes(
-    *,
-    elem,
-    emit_attrs: EmitAttrs,
-    material_ids: Sequence[int] | None = None,
-    skin_bind_node_ids: Sequence[int] | None = None,
-    reference: NodeReference | None = None,
-) -> None:
-    write_attributes(elem, emit_attrs.node)
+def write_node_attributes(*, elem, node: "SceneNode") -> None:
+    """Write all node attributes including shapeId, materialIds, skinBindNodeIds, and reference data."""
+    write_attributes(elem, node.attrs.node)
 
-    if material_ids is not None:
-        xml_i3d.write_attribute(elem, "materialIds", ",".join(str(int(mid)) for mid in material_ids))
+    # Shape attributes
+    if (shape := node._shape) is not None:
+        xml_i3d.write_attribute(elem, "shapeId", int(shape.shape_id))
 
-    if skin_bind_node_ids is not None:
-        xml_i3d.write_attribute(elem, "skinBindNodeIds", " ".join(str(int(nid)) for nid in skin_bind_node_ids))
+        if shape.material_ids:
+            xml_i3d.write_attribute(elem, "materialIds", ",".join(str(int(mid)) for mid in shape.material_ids))
 
-    if reference is not None:
-        if reference.id is not None:
-            xml_i3d.write_attribute(elem, "referenceId", int(reference.id))
+        if shape.skin_bind_node_ids:
+            xml_i3d.write_attribute(
+                elem, "skinBindNodeIds", " ".join(str(int(nid)) for nid in shape.skin_bind_node_ids)
+            )
 
-        if reference.child_path:
-            xml_i3d.write_attribute(elem, "referenceChildPath", str(reference.child_path))
+    # Reference attributes
+    if (ref := node._ref) is not None:
+        xml_i3d.write_attribute(elem, "referenceId", int(ref.reference_id))
 
-        if reference.runtime_loaded is False:
+        if ref.child_path:
+            xml_i3d.write_attribute(elem, "referenceChildPath", str(ref.child_path))
+
+        if ref.runtime_loaded is False:
             xml_i3d.write_attribute(elem, "referenceRuntimeLoaded", False)
 
 

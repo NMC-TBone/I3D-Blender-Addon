@@ -77,19 +77,17 @@ def _iter_mapped_entries_preorder(ctx: "ExportContext"):
       child: "0>2"
       grandchild: "0>2|1"
     """
-    nodes = ctx.ir.scene_nodes
-    stack: list[tuple[int, str]] = [(rid, f"{i}>") for i, rid in reversed(list(enumerate(ctx.ir.roots)))]
+    stack: list[tuple[int, str]] = [(root.id, f"{i}>") for i, root in reversed(list(enumerate(ctx.ir.iter_roots())))]
+    mapped = ctx.ir.index.mapping_id_by_node_id
 
     while stack:
         nid, path = stack.pop()
-        node = nodes[nid]
-
-        if node.i3d_mapping:
-            mapping_id = node.i3d_mapping_name.strip() or str(node.id)
+        if (mapping_id := mapped.get(nid)) is not None:
             yield mapping_id, path
 
+        child_ids = ctx.ir.emitted_child_ids(nid)
         sep = "" if path.endswith(">") else "|"
-        for child_i, child_id in reversed(list(enumerate(node.children))):
+        for child_i, child_id in reversed(list(enumerate(child_ids))):
             stack.append((child_id, f"{path}{sep}{child_i}"))
 
 

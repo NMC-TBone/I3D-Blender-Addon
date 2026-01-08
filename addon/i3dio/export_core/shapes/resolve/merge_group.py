@@ -109,7 +109,7 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             if isinstance(ref, bpy.types.Object) and ref.type == "MESH":
                 entry.contributors.append(ShapeContributor(obj=ref, reference_frame=root_frame, bind_index=bind_index))
 
-        # Mutate IR nodes
+        # Mutate IR nodes (root_node is already SHAPE kind from traversal, _shape exists)
         root_node.shape.shape_id = entry.id
         root_node.shape.skin_bind_node_ids = ordered
 

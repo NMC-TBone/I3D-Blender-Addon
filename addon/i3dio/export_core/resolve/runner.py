@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from .armatures import resolve_armatures
 from .kinds import resolve_kind_for_node
-from .mappings import finalize_i3d_mapping_for_node
+from .mappings import collect_i3d_mappings
 from .materials import resolve_material_shading
 from .matrices import resolve_matrices
 from .names import finalize_name_for_node
@@ -47,10 +47,6 @@ def resolve_all(ctx: "ExportContext") -> None:
 
     for node in ctx.ir.scene_nodes.values():
         resolve_properties(ctx, node)
-        finalize_i3d_mapping_for_node(ctx, node)
-
-    # resolve/fixups (future)
-    # resolve_constraints(ctx)
 
     valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)
@@ -59,19 +55,19 @@ def resolve_all(ctx: "ExportContext") -> None:
         resolve_material_properties(ctx, m)
         resolve_material_shading(ctx, m)
     resolve_matrices(ctx)
+    collect_i3d_mappings(ctx)
 
     kinds = Counter()
-    emitted = mapped = 0
+    emitted = 0
     for n in ctx.ir.iter_nodes(emitted_only=True):
         kinds[n.kind] += 1
         emitted += int(n.emit)
-        mapped += int(n.i3d_mapping)
 
     rep.debug(
         "Resolve summary: emitted=%d/%d mapped=%d kinds=%s",
         emitted,
         len(ctx.ir.scene_nodes),
-        mapped,
+        len(ctx.ir.index.mapping_id_by_node_id.keys()),
         {k.name: v for k, v in kinds.items()},
     )
     ctx.files.finalize()

@@ -16,9 +16,7 @@ def resolve_skinned_meshes(ctx: ExportContext) -> None:
     bones_by_arm_ptr = ctx.ir.index.bone_nodes_by_armature_ptr
 
     processed = 0
-    for node in ctx.ir.iter_objects(obj_type="MESH"):
-        if node.kind is not NodeKind.SHAPE:
-            continue
+    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE):
         obj = node.obj
         obj_rep = ctx.object_reporter(obj, "skinned_mesh")
         # Find armature modifiers with valid armature object.
@@ -73,6 +71,7 @@ def resolve_skinned_meshes(ctx: ExportContext) -> None:
         if entry.contributors:
             entry.contributors[0].skin_vgroup_to_bind_index = vgroup_to_bind
 
+        # Node is already SHAPE kind (from resolve_kinds), so _shape exists
         node.shape.shape_id = entry.id
         node.shape.skin_bind_node_ids = bind_node_ids
 

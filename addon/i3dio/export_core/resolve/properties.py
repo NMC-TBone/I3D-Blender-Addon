@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import bpy
 
 from ... import utility
-from ..ir import EmitAttrs, NodeKind, NodeReference, SceneNode
+from ..ir import EmitAttrs, NodeKind, ReferenceNodeExt, SceneNode
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -160,12 +160,12 @@ def _resolve_reference_path(ctx: "ExportContext", node: SceneNode) -> None:
         ctx.node_reporter(node, "properties").warning("Reference path does not end with '.i3d': %r", reference_path)
         return
     node.kind = NodeKind.REFERENCE_NODE
-    node.tg.reference = NodeReference(id=ctx.files.add_reference(reference_path))
+    node.ref = ReferenceNodeExt(reference_id=ctx.files.add_reference(reference_path))
     if not obj.i3d_reference.runtime_loaded:
-        node.tg.reference.runtime_loaded = False  # default is True, only write when False
+        node.ref.runtime_loaded = False  # default is True, only write when False
 
     if child_path := obj.i3d_reference.child_path.strip():
-        node.tg.reference.child_path = child_path
+        node.ref.child_path = child_path
 
 
 # Collection / routing
@@ -186,7 +186,7 @@ def _collect_pg(
         and scene_node is not None
         and scene_node.kind == NodeKind.SHAPE
         and "IndexedTriangleSet" in {spec.placement for spec in bundle.export}
-        and (sid := scene_node.shape_id) is not None
+        and (sid := scene_node.shape.shape_id) is not None
     ):
         shape_sink = ctx.shapes.get_entry(sid).attrs.node
 

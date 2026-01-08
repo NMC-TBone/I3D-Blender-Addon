@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Iterable
 import bpy
 import mathutils
 
-from ...ir import NodeKind
+from ...ir import NodeKind, SourceKind, set_kind
 from ...model.shapes import ShapeVariant
 from ...shapes import ShapeMode
 from .. import ShapeContributor
@@ -43,13 +43,10 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
     rep = ctx.section("merge_children")
 
     for root_id in ctx.ir.index.merge_children_roots:
-        node = ctx.ir.scene_nodes.get(root_id)
-        if node is None or not node.emit:
+        node = ctx.ir.scene_nodes[root_id]
+        if not node.emit or node.source_kind is not SourceKind.OBJECT:
             continue
-
-        obj = node.blender_ref
-        if not isinstance(obj, bpy.types.Object):
-            continue
+        obj = node.obj
 
         apply_transforms = bool(obj.i3d_merge_children.apply_transforms)
         steps = int(obj.i3d_merge_children.interpolation_steps)
@@ -74,17 +71,15 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
             entry.contributors.append(ShapeContributor(mesh_obj, ref_frame, generic_value01=g))
 
         # Root becomes a Shape in Scene and points at shapeId
-        node.kind = NodeKind.SHAPE
-        node.shape_id = entry.id
+        set_kind(node, NodeKind.SHAPE)
+        # set_kind ensures _shape exists, so safe to use property
+        node.shape.shape_id = entry.id
 
         rep.debug("[%s] MergeChildren shapeId=%d contributors=%d", obj.name, entry.id, len(entry.contributors))
 
 
 def _collect_contributors(
-    root_obj: bpy.types.Object,
-    *,
-    apply_transforms: bool,
-    steps: int,
+    root_obj: bpy.types.Object, *, apply_transforms: bool, steps: int
 ) -> list[tuple[bpy.types.Object, mathutils.Matrix, float]]:
     """Returns list of (mesh_obj, reference_frame, generic_value01). Root mesh is excluded."""
     root_world = root_obj.matrix_world.copy()
@@ -104,7 +99,7 @@ def _collect_contributors(
 
 
 def _iter_mesh_objects_recursive(obj: bpy.types.Object) -> Iterable[bpy.types.Object]:
-    if obj.type == "MESH":
+    if obj.type == 'MESH':
         yield obj
     for ch in obj.children:
         yield from _iter_mesh_objects_recursive(ch)

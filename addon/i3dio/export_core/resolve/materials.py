@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ..model.materials import MaterialEntry
 
 
-def resolve_material_shading(ctx: "ExportContext", entry: "MaterialEntry") -> None:
+def resolve_material_shading(ctx: ExportContext, entry: MaterialEntry) -> None:
     """Populate Material XML (textures/colors/custom shader) from Blender material data."""
     mat = entry.blender_material
     if mat is None or not isinstance(mat, bpy.types.Material):

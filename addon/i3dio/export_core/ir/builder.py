@@ -12,8 +12,7 @@ from .model import NodeKind, SceneNode, SourceKind
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
-
-BlenderRef = bpy.types.Object | bpy.types.Collection | BoneRef
+    from .model import BlenderRef
 
 
 def _blender_ptr(x: object) -> int | None:
@@ -27,42 +26,73 @@ def _blender_ptr(x: object) -> int | None:
         return None
 
 
-def _source_meta(ref: object) -> tuple[SourceKind, int | None, str | None]:
-    if isinstance(ref, bpy.types.Object):
-        return (SourceKind.OBJECT, _blender_ptr(ref), ref.type)
-    if isinstance(ref, bpy.types.Collection):
-        return (SourceKind.COLLECTION, _blender_ptr(ref), None)
-    if isinstance(ref, BoneRef):
-        return (SourceKind.BONE_REF, None, None)
-    return (SourceKind.OTHER, _blender_ptr(ref), None)
-
-
 @dataclass(slots=True)
 class SceneBuilder:
     ctx: ExportContext
 
-    def add_scene_node(self, *, kind: NodeKind, blender_ref: BlenderRef, parent_id: int | None) -> int:
-        """Create a SceneNode in IR and attach it into the tree."""
+    def _add_node(
+        self,
+        *,
+        kind: NodeKind,
+        name: str,
+        blender_ref: BlenderRef,
+        source_kind: SourceKind,
+        source_ptr: int | None,
+        source_object_type: str | None,
+        parent_id: int | None,
+    ) -> int:
+        """Low-level node creation. Keeps identity deterministic."""
         node_id = self.ctx.ids.alloc(IdKind.NODE)
-        source_kind, source_ptr, source_object_type = _source_meta(blender_ref)
-        node = SceneNode(
-            id=node_id,
-            name=getattr(blender_ref, "name", f"Node_{node_id}"),
-            source_kind=source_kind,
-            source_ptr=source_ptr,
-            source_object_type=source_object_type,
-            kind=kind,
-            blender_ref=blender_ref,
-            parent_id=parent_id,
+
+        self.ctx.ir.add_node(
+            SceneNode(
+                id=node_id,
+                name=name,
+                kind=kind,
+                parent_id=parent_id,
+                # identity (stable through export)
+                source_kind=source_kind,
+                source_ptr=source_ptr,
+                source_object_type=source_object_type,
+                blender_ref=blender_ref,
+            )
         )
-        self.ctx.ir.add_node(node)
         return node_id
 
     def add_object(self, obj: bpy.types.Object, *, parent_id: int | None) -> int:
-        return self.add_scene_node(kind=NodeKind.UNRESOLVED, blender_ref=obj, parent_id=parent_id)
+        """Add an object node"""
+        return self._add_node(
+            kind=NodeKind.UNRESOLVED,
+            name=obj.name,
+            blender_ref=obj,
+            source_kind=SourceKind.OBJECT,
+            source_ptr=_blender_ptr(obj),
+            source_object_type=obj.type,
+            parent_id=parent_id,
+        )
 
     def add_collection(self, col: bpy.types.Collection, *, parent_id: int | None) -> int:
-        return self.add_scene_node(kind=NodeKind.TRANSFORM_GROUP, blender_ref=col, parent_id=parent_id)
+        """Add a collection node"""
+        return self._add_node(
+            kind=NodeKind.TRANSFORM_GROUP,
+            name=col.name,
+            blender_ref=col,
+            source_kind=SourceKind.COLLECTION,
+            source_ptr=_blender_ptr(col),
+            source_object_type=None,
+            parent_id=parent_id,
+        )
 
     def add_bone(self, bone_ref: BoneRef, *, parent_id: int) -> int:
-        return self.add_scene_node(kind=NodeKind.TRANSFORM_GROUP, blender_ref=bone_ref, parent_id=parent_id)
+        """Add a bone node (stored as BoneRef in blender_ref)"""
+        # NOTE: We do not index BoneRef by pointer in node_id_by_blender_ptr. BoneRef isn't a Blender ID datablock
+        # with a stable as_pointer(), and mixing armature pointers into the same lookup can be confusing.
+        return self._add_node(
+            kind=NodeKind.TRANSFORM_GROUP,
+            name=bone_ref.name,
+            blender_ref=bone_ref,
+            source_kind=SourceKind.BONE_REF,
+            source_ptr=None,
+            source_object_type=None,
+            parent_id=parent_id,
+        )

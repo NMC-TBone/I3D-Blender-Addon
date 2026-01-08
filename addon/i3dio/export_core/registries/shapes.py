@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import bpy
 
 from ..ids import IdKind
-from ..ir import NodeKind, SceneNode, to_transform_group
+from ..ir import SceneNode, ShapeSceneExt, to_transform_group
 from ..model.its import BuiltITS
 from ..model.shapes import ShapeEntry, ShapeKey, ShapeVariant
 from ..shapes import ShapeContributor, ShapeMode
@@ -86,17 +86,13 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         return self._alloc_entry(key=key, name=name, mode=mode)
 
     def add_skinned_mesh_shape(self, obj: bpy.types.Object, *, name: str | None = None) -> ShapeEntry:
-        """Create a per-object skinned mesh shape entry.
-
-        We force apply_modifiers=False to keep mesh vertex topology aligned with
-        Object vertex groups and weight data.
-        """
+        """Create a per-object skinned mesh shape entry."""
         mesh = obj.data
         key = ShapeKey(
             kind="IndexedTriangleSet",
             data_ptr=mesh.as_pointer() if hasattr(mesh, "as_pointer") else 0,
             object_ptr=obj.as_pointer(),
-            apply_modifiers=False,
+            apply_modifiers=self.ctx.setting("apply_modifiers", True),
             variant=ShapeVariant.SKINNED_MESH,
         )
         entry = self._alloc_entry(key=key, name=name or getattr(mesh, "name", obj.name), mode=ShapeMode.SKINNED_MESH)
@@ -106,19 +102,17 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
 
     def link_node(self, node: SceneNode) -> None:
         """Link a SceneNode to a ShapeEntry by setting node.shape_id."""
-        ref = node.blender_ref
-        if node.kind != NodeKind.SHAPE or not node.emit:
-            return
-        if node.shape_id is not None:
-            return
-        if not isinstance(ref, bpy.types.Object):
-            node.kind = NodeKind.TRANSFORM_GROUP
-            return
+        # Check if already linked by inspecting shape_id directly
+        if node._shape is not None and node._shape.shape_id is not None:
+            return  # already linked
 
         self.ctx.node_reporter(node, "shape").debug("Linking ShapeEntry to SceneNode")
-
-        if isinstance(ref.data, bpy.types.Mesh):
-            node.shape_id = self.get_or_add_mesh(ref)
+        if node.source_object_type == 'MESH':
+            shape_id = self.get_or_add_mesh(node.obj)
+            # Ensure _shape extension exists before assigning shape_id
+            if node._shape is None:
+                node._shape = ShapeSceneExt()
+            node._shape.shape_id = shape_id
             return
 
         # future: Curve support

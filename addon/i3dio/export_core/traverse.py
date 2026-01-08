@@ -33,7 +33,7 @@ def _add_object_with_children(
         return  # excluded
     obj_type = obj.type
     rep = ctx.object_reporter(obj, "traverse")
-    if obj_type == 'MESH' and obj.i3d_merge_children.enabled and ctx.has_feature("MERGE_CHILDREN"):
+    if obj_type == 'MESH' and obj.i3d_merge_children.enabled and ctx.has_feature('MERGE_CHILDREN'):
         ctx.ir.index.merge_children_roots.append(node_id)
         rep.debug("MergeChildren root: skipping child traversal")
         return  # skip children
@@ -41,9 +41,9 @@ def _add_object_with_children(
     if expand_instance_collections and obj.instance_collection is not None:
         rep.debug("Expanding instance_collection %r", obj.instance_collection.name)
         add_collection(ctx, obj.instance_collection, node_id)
-        return
+        return  # NOTE: technically instance_collection can have "non instance" children, will have to test later
 
-    if obj_type == 'MESH' and (mg := obj.i3d_merge_group_index) >= 0 and ctx.has_feature("MERGE_CHILDREN"):
+    if obj_type == 'MESH' and (mg := obj.i3d_merge_group_index) >= 0 and ctx.has_feature('MERGE_GROUPS'):
         ctx.ir.index.merge_group_nodes_by_index.setdefault(mg, []).append(node_id)
         rep.debug("Added to MergeGroup %d", mg)
 

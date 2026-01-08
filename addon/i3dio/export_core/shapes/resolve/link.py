@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ...ir import NodeKind
+
 if TYPE_CHECKING:
     from ...ctx import ExportContext
 
 
-def resolve_shape_links(ctx: "ExportContext") -> None:
-    for node in ctx.ir.scene_nodes.values():
+def resolve_shape_links(ctx: ExportContext) -> None:
+    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, emitted_only=True):
         ctx.shapes.link_node(node)

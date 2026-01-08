@@ -3,30 +3,40 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..ir import SceneNode
+from ..ir import SourceKind
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
 
 
-def finalize_i3d_mapping_for_node(ctx: "ExportContext", node: SceneNode) -> None:
-    """
-    Tag nodes that should be included in i3dMappings export.
+def _read_mapping(pg) -> tuple[bool, str]:
+    """Read mapping properties from a property group"""
+    return bool(getattr(pg, "is_mapped", False)), (getattr(pg, "mapping_name", "") or "").strip()
 
-        Stores:
-            node.i3d_mapping = True
-            node.i3d_mapping_name = "..." (optional)
+
+def collect_i3d_mappings(ctx: ExportContext) -> None:
     """
-    if not node.emit:
-        ctx.node_reporter(node, "i3dMappings").debug("Skipping unmapped unemit node")
-        return  # e.g. collapsed armatures must not be mapped
-    try:
-        mapping_pg = node.blender_ref.i3d_mapping
-    except AttributeError:
-        return
-    if not mapping_pg.is_mapped:
-        return
-    node.i3d_mapping = True
-    mapping_name = (mapping_pg.mapping_name or node.name).strip()
-    node.i3d_mapping_name = mapping_name
-    ctx.node_reporter(node, "i3dMappings").debug("Marked for mapping (name=%r)", mapping_name)
+    Collect i3dMapping entries from Blender properties and store them in IRIndex.
+    Keeps SceneNode clean: mapping is an export sidecar feature.
+    """
+    out = ctx.ir.index.mapping_id_by_node_id
+    out.clear()
+    for node in ctx.ir.iter_nodes(emitted_only=True):
+        if node.source_kind is SourceKind.OBJECT:
+            obj = node.obj
+            is_mapped, mapping_name = _read_mapping(obj.i3d_mapping)
+        elif node.source_kind is SourceKind.BONE_REF:
+            if (bone := node.bone_ref.data_bone()) is None:
+                continue
+            is_mapped, mapping_name = _read_mapping(bone.i3d_mapping)
+        else:
+            continue
+        if not is_mapped:
+            continue
+        mapping_id = mapping_name or node.name
+        if mapping_id in out.values():
+            mapping_id = f"{mapping_id}_{node.id}"
+            ctx.node_reporter(node, "mappings").warning(
+                "Duplicate i3dMapping id; renamed to %r", mapping_id, code="duplicate_i3d_mapping_id"
+            )
+        out[node.id] = mapping_id

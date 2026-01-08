@@ -9,10 +9,7 @@ import mathutils
 
 @dataclass(frozen=True, slots=True)
 class BoneRef:
-    """Reference to a bone within an armature object.
-
-    We store this as the IR node blender_ref for exported bone nodes.
-    """
+    """Reference to a bone within an armature object. This is stored as the IR node blender_ref for bone nodes."""
 
     armature_obj: bpy.types.Object
     bone_name: str
