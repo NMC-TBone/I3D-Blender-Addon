@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import bpy
 
 from ... import utility
-from ..ir import EmitAttrs, NodeKind, ReferenceNodeExt, SceneNode
+from ..ir import EmitAttrs, NodeKind, SceneNode, set_kind
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -159,8 +159,8 @@ def _resolve_reference_path(ctx: "ExportContext", node: SceneNode) -> None:
     if not reference_path.lower().endswith(".i3d"):
         ctx.node_reporter(node, "properties").warning("Reference path does not end with '.i3d': %r", reference_path)
         return
-    node.kind = NodeKind.REFERENCE_NODE
-    node.ref = ReferenceNodeExt(reference_id=ctx.files.add_reference(reference_path))
+    set_kind(node, NodeKind.REFERENCE_NODE)
+    node.ref.reference_id = ctx.files.add_reference(reference_path)
     if not obj.i3d_reference.runtime_loaded:
         node.ref.runtime_loaded = False  # default is True, only write when False
 
@@ -184,7 +184,7 @@ def _collect_pg(
     if (
         ctx is not None
         and scene_node is not None
-        and scene_node.kind == NodeKind.SHAPE
+        and scene_node.kind is NodeKind.SHAPE
         and "IndexedTriangleSet" in {spec.placement for spec in bundle.export}
         and (sid := scene_node.shape.shape_id) is not None
     ):

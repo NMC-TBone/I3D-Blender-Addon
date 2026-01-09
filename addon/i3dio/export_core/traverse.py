@@ -98,7 +98,7 @@ def add_collection(
     if not emit_self or not ctx.setting("keep_collections_as_transformgroups", False):
         build_from_collection(ctx, collection, parent_id)
         return
-    node_id = ctx.builder.add_collection(collection=collection, parent_id=parent_id)
+    node_id = ctx.builder.add_collection(collection, parent_id=parent_id)
     build_from_collection(ctx, collection, node_id)
 
 
