@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from ... import xml_i3d
 
 if TYPE_CHECKING:
-    from ..shapes.its import BuiltITS
+    from ..model.its import BuiltITS
 
 CHUNK_LINES = 30_000  # number of lines to buffer before writing to file, more or less a random guess
 

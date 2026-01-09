@@ -27,10 +27,7 @@ def _leading_ws(line: str, default: str = INDENT_STEP) -> str:
     return line[: len(line) - len(stripped)] or default
 
 
-def _find_or_insert_i3d_mappings_block(
-    ctx: "ExportContext",
-    lines: list[str],
-) -> tuple[int, int, str] | None:
+def _find_or_insert_i3d_mappings_block(ctx: ExportContext, lines: list[str]) -> tuple[int, int, str] | None:
     """
     Ensure `<i3dMappings> ... </i3dMappings>` exists and return (open_idx, close_idx, base_indent).
     Inserts the block just before the last closing XML tag if missing.

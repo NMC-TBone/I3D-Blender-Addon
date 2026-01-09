@@ -1,4 +1,4 @@
-# i3dio/export_core/shapes/its/material_resolve.py
+# i3dio/export_core/shapes/material_resolve.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,7 +8,7 @@ import bpy
 import numpy as np
 
 if TYPE_CHECKING:
-    from ...ctx import ExportContext
+    from ..ctx import ExportContext
 
 
 @dataclass(slots=True)

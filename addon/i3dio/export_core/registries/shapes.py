@@ -9,9 +9,9 @@ import bpy
 from ..ids import IdKind
 from ..ir import SceneNode, ShapeSceneExt, to_transform_group
 from ..model.its import BuiltITS
-from ..model.shapes import ShapeEntry, ShapeKey, ShapeVariant
-from ..shapes import ShapeContributor, ShapeMode
-from ..shapes.its.build import build_indexed_triangle_set
+from ..model.shapes import ShapeEntry, ShapeKey, ShapeMode
+from ..shapes import ShapeContributor
+from ..shapes.build_its import build_indexed_triangle_set
 from .base import IdEntryTable
 
 if TYPE_CHECKING:
@@ -25,9 +25,9 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
     _entries: dict[int, ShapeEntry] = field(default_factory=dict)
     built_by_id: dict[int, BuiltITS | None] = field(default_factory=dict)
 
-    def _alloc_entry(self, *, key: ShapeKey, name: str, mode: ShapeMode) -> ShapeEntry:
+    def _alloc_entry(self, *, key: ShapeKey, name: str) -> ShapeEntry:
         sid = self.ctx.ids.alloc(IdKind.SHAPE)
-        entry = ShapeEntry(id=sid, key=key, name=name, mode=mode)
+        entry = ShapeEntry(id=sid, key=key, name=name)
         self.register(key=key, entry_id=sid, entry=entry)
         return entry
 
@@ -52,50 +52,38 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         has_enabled_modifiers = any(m.show_viewport for m in obj.modifiers)
         object_ptr = obj.as_pointer() if (apply_modifiers and has_enabled_modifiers) else 0
 
-        key = ShapeKey(
-            kind="IndexedTriangleSet",
+        key = ShapeKey.for_mesh(
             data_ptr=mesh.as_pointer(),
             object_ptr=object_ptr,
             apply_modifiers=apply_modifiers,
-            variant=ShapeVariant.NORMAL,
             slot_name_signature=_slot_name_signature(obj),
         )
         if (sid := self.get_id(key)) is not None:
             return sid
-        entry = self._alloc_entry(key=key, name=mesh.name, mode=ShapeMode.NORMAL)
+        entry = self._alloc_entry(key=key, name=mesh.name)
         entry.contributors.append(ShapeContributor(obj=obj, reference_frame=None))
         return entry.id
 
     def add_merge_shape(
-        self,
-        *,
-        root_obj: bpy.types.Object,
-        name: str,
-        mode: ShapeMode,
-        variant: ShapeVariant,
-        merge_group_index: int | None = None,
+        self, *, root_obj: bpy.types.Object, name: str, mode: ShapeMode, merge_group_index: int | None = None
     ) -> ShapeEntry:
-        key = ShapeKey(
-            kind="IndexedTriangleSet",
-            data_ptr=0,
+        key = ShapeKey.for_merge(
             object_ptr=root_obj.as_pointer(),
             apply_modifiers=self.ctx.setting("apply_modifiers", True),
-            variant=variant,
+            mode=mode,
             merge_group_index=merge_group_index,
         )
-        return self._alloc_entry(key=key, name=name, mode=mode)
+        return self._alloc_entry(key=key, name=name)
 
     def add_skinned_mesh_shape(self, obj: bpy.types.Object, *, name: str | None = None) -> ShapeEntry:
         """Create a per-object skinned mesh shape entry."""
         mesh = obj.data
-        key = ShapeKey(
-            kind="IndexedTriangleSet",
+        key = ShapeKey.for_skinned(
             data_ptr=mesh.as_pointer() if hasattr(mesh, "as_pointer") else 0,
             object_ptr=obj.as_pointer(),
             apply_modifiers=self.ctx.setting("apply_modifiers", True),
-            variant=ShapeVariant.SKINNED_MESH,
         )
-        entry = self._alloc_entry(key=key, name=name or getattr(mesh, "name", obj.name), mode=ShapeMode.SKINNED_MESH)
+        entry = self._alloc_entry(key=key, name=name or getattr(mesh, "name", obj.name))
         entry.enable_skin_weights()
         entry.contributors.append(ShapeContributor(obj=obj, reference_frame=None))
         return entry

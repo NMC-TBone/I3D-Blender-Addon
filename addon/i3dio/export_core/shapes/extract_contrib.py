@@ -1,0 +1,265 @@
+# i3dio/export_core/shapes/extract_contrib.py
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+import bpy
+import numpy as np
+
+from ..blender.evaluated_mesh import evaluated_mesh_for_export, free_evaluated_mesh
+from ..model.its import MaterialKeyKind
+from ..model.shapes import ShapeContributor
+from .material_resolve import materials_requiring_vcol, resolve_slots
+
+if TYPE_CHECKING:
+    from ..ctx import ExportContext
+
+MAX_UV_LAYERS = 4
+
+
+@dataclass(slots=True)
+class ItsContributorStream:
+    """Intermediate per-mesh vertex/triangle data extracted from Blender."""
+
+    obj_name: str
+    loop_count: int
+
+    positions: np.ndarray  # (L,3) float32
+    normals: np.ndarray  # (L,3) float32
+    uvs: list[np.ndarray]  # 0..4 each (L,2) float32
+
+    # Vertex color export decision for THIS contributor (not the final merged ITS)
+    want_color_attr: bool
+    color: np.ndarray | None  # (L,4) float32 RGBA (only present if extracted)
+
+    tri_loops: np.ndarray  # (T,3) int32, loop indices
+    tri_mat_id: np.ndarray  # (T,) int32, material key per tri
+
+    # NOTE: these are scalars; merge can broadcast to slice (cheaper than per-loop arrays)
+    generic_value01: float | None
+    bind_idx: int | None
+
+    # Skinned mesh: (L,4)
+    blend_weights: np.ndarray | None = None  # (L,4) float32
+    blend_indices: np.ndarray | None = None  # (L,4) int32
+
+
+def extract_contrib_its(
+    ctx: ExportContext,
+    contrib: ShapeContributor,
+    want_g: bool,
+    want_bi: bool,
+    want_skin: bool,
+    *,
+    material_kind: MaterialKeyKind = MaterialKeyKind.SLOT_INDEX,
+) -> ItsContributorStream | None:
+    obj = contrib.obj
+    if not isinstance(obj, bpy.types.Object) or not isinstance(obj.data, bpy.types.Mesh):
+        return None
+
+    ev_obj, mesh = evaluated_mesh_for_export(ctx, obj, reference_frame=contrib.reference_frame)
+
+    try:
+        num_loops = len(mesh.loops)
+        num_triangles = len(mesh.loop_triangles)
+        if num_loops == 0 or num_triangles == 0:
+            return None
+
+        len_verts = len(mesh.vertices)
+
+        # ---- loop -> vertex positions ----
+        loop_vert_idx = np.empty(num_loops, dtype=np.int32)
+        mesh.loops.foreach_get("vertex_index", loop_vert_idx)
+
+        vert_co = np.empty((len_verts, 3), dtype=np.float32)
+        mesh.vertices.foreach_get("co", vert_co.ravel())
+        positions = vert_co[loop_vert_idx]  # (L,3)
+
+        # ---- loop normals ----
+        normals = np.empty((num_loops, 3), dtype=np.float32)
+        mesh.loops.foreach_get("normal", normals.ravel())
+
+        # ---- uvs (0..4) ----
+        uv_layers = list(mesh.uv_layers)
+        if ctx.setting("alphabetic_uvs", False):
+            uv_layers.sort(key=lambda ul: ul.name.casefold())
+        uv_layers = uv_layers[:MAX_UV_LAYERS]
+
+        uvs: list[np.ndarray] = []
+        for ul in uv_layers:
+            uv = np.empty((num_loops, 2), dtype=np.float32)
+            ul.data.foreach_get("uv", uv.ravel())
+            uvs.append(uv)
+
+        # ---- triangles as loop indices ----
+        tri_loops = np.empty((num_triangles, 3), dtype=np.int32)
+        mesh.loop_triangles.foreach_get("loops", tri_loops.ravel())
+
+        # ---- triangle -> polygon -> material slot index ----
+        tri_poly = np.empty(num_triangles, dtype=np.int32)
+        mesh.loop_triangles.foreach_get("polygon_index", tri_poly)
+
+        poly_mat = np.empty(len(mesh.polygons), dtype=np.int32)
+        mesh.polygons.foreach_get("material_index", poly_mat)
+
+        tri_mat_idx = poly_mat[tri_poly]  # (T,) slot indices from mesh
+
+        slot_materials = [s.material for s in ev_obj.material_slots] if ev_obj.material_slots else list(mesh.materials)
+
+        # ---- material keys per tri ----
+        tri_mat_key = _resolve_tri_material_keys(ctx, obj, tri_mat_idx, slot_materials, material_kind, num_triangles)
+
+        # ---- vertex colors (decide first, then read only if needed) ----
+        mode = _effective_color_export_mode(ctx, obj.data)
+        has_vcol = bool(mesh.color_attributes)
+
+        if mode == "AUTO":
+            mats_need = materials_requiring_vcol(slot_materials)
+            want_color_attr = bool(mats_need)
+            if want_color_attr and not has_vcol:
+                ctx.object_reporter(obj, "vertex_colors").warning(
+                    "Vertex color attribute is required by material(s): %s, but this mesh has no vertex color layer. "
+                    "Export will pad zeros. Add/paint a vertex color layer or switch color export mode.",
+                    ", ".join(mats_need),
+                    code="vertex_color_missing_required",
+                )
+        else:  # "IF_PRESENT"
+            want_color_attr = has_vcol
+
+        color = None
+        if want_color_attr and has_vcol:
+            layer = mesh.color_attributes.active_color or mesh.color_attributes[0]
+            is_point = layer.domain == "POINT"
+            src_len = len_verts if is_point else num_loops
+            colors_srgb = np.empty((src_len, 4), dtype=np.float32)
+            layer.data.foreach_get("color_srgb", colors_srgb.ravel())
+            color = colors_srgb[loop_vert_idx] if is_point else colors_srgb
+
+        # ---- constant features (scalars, broadcast later) ----
+        generic_value01 = float(contrib.generic_value01 or 0.0) if want_g else None
+        bind_idx = int(contrib.bind_index or 0) if want_bi else None
+
+        # ---- skin weights (optional) ----
+        blend_weights = None
+        blend_indices = None
+        if want_skin:
+            if vmap := contrib.skin_vgroup_to_bind_index or {}:
+                blend_weights, blend_indices = _extract_skin_weights(mesh, loop_vert_idx, vmap)
+
+        return ItsContributorStream(
+            obj_name=obj.name,
+            loop_count=num_loops,
+            positions=positions,
+            normals=normals,
+            uvs=uvs,
+            want_color_attr=want_color_attr,
+            color=color,
+            tri_loops=tri_loops,
+            tri_mat_id=tri_mat_key,
+            generic_value01=generic_value01,
+            bind_idx=bind_idx,
+            blend_weights=blend_weights,
+            blend_indices=blend_indices,
+        )
+
+    finally:
+        free_evaluated_mesh(ev_obj)
+
+
+def _extract_skin_weights(
+    mesh: bpy.types.Mesh, loop_vert_idx: np.ndarray, vmap: dict[int, int]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Top-4 normalized weights per vertex, expanded to loops."""
+    len_verts = len(mesh.vertices)
+    bw_v = np.zeros((len_verts, 4), dtype=np.float32)
+    bi_v = np.zeros((len_verts, 4), dtype=np.int32)
+
+    for vi, v in enumerate(mesh.vertices):
+        items: list[tuple[int, float]] = []
+        for g in v.groups:
+            bidx = vmap.get(int(g.group))
+            if bidx is None:
+                continue
+            w = float(g.weight)
+            if w > 0.0:
+                items.append((int(bidx), w))
+
+        if not items:
+            continue
+
+        # Keep highest weights, deterministic tie-break by bind index.
+        items.sort(key=lambda it: (-it[1], it[0]))
+        items = items[:4]
+
+        total = sum(w for _, w in items)
+        if total <= 0.0:
+            continue
+
+        inv_total = 1.0 / total
+        for slot, (bidx, w) in enumerate(items):
+            bi_v[vi, slot] = bidx
+            bw_v[vi, slot] = w * inv_total
+
+    return bw_v[loop_vert_idx], bi_v[loop_vert_idx]
+
+
+def _resolve_tri_material_keys(
+    ctx: ExportContext,
+    obj: bpy.types.Object,
+    tri_mat_idx: np.ndarray,
+    slot_materials: list[bpy.types.Material | None],
+    material_kind: MaterialKeyKind,
+    num_triangles: int,
+) -> np.ndarray:
+    """Resolve per-triangle material keys, warning about invalid slot references."""
+    # Validate slot indices and warn about issues
+    valid_mask: np.ndarray | None = None
+    if slot_materials:
+        slot_count = len(slot_materials)
+        valid_mask = (tri_mat_idx >= 0) & (tri_mat_idx < slot_count)
+
+        if (bad := int(np.count_nonzero(~valid_mask))) > 0:
+            ctx.object_reporter(obj, "materials").warning(
+                "%d triangles reference out-of-bounds material slots; using fallback/default material",
+                bad,
+                code="materials_slot_index_out_of_bounds",
+            )
+
+        # Check for empty slots among valid indices
+        slots_is_none = np.fromiter((m is None for m in slot_materials), dtype=np.bool_, count=slot_count)
+        if np.any(valid_mask) and np.any(slots_is_none):
+            empty_bad = int(np.count_nonzero(slots_is_none[tri_mat_idx[valid_mask]]))
+            if empty_bad:
+                ctx.object_reporter(obj, "materials").warning(
+                    "%d triangles reference empty material slots; using fallback/default material",
+                    empty_bad,
+                    code="materials_slot_is_empty",
+                )
+
+    # SLOT_INDEX: keep raw slot indices (per-node materialIds mapping happens later)
+    if material_kind == MaterialKeyKind.SLOT_INDEX:
+        return tri_mat_idx if slot_materials else np.zeros(num_triangles, dtype=np.int32)
+
+    # MATERIAL_ID: resolve to global IDs so different slot layouts merge correctly
+    res = resolve_slots(ctx, slot_materials=slot_materials)
+    fallback_id = res.fallback_id if res.fallback_id is not None else ctx.materials.get_default_id()
+
+    if not slot_materials:
+        return np.full(num_triangles, fallback_id, dtype=np.int32)
+
+    tri_mat_key = np.empty(num_triangles, dtype=np.int32)
+    valid = valid_mask if valid_mask is not None else (tri_mat_idx >= 0) & (tri_mat_idx < len(slot_materials))
+    tri_mat_key[valid] = res.slot_ids[tri_mat_idx[valid]]
+    tri_mat_key[~valid] = fallback_id
+    return tri_mat_key
+
+
+def _effective_color_export_mode(ctx: "ExportContext", src_mesh: bpy.types.Mesh) -> str:
+    override = ctx.setting("vertex_color_override", "USE_MESH")
+    if override == "FORCE_AUTO":
+        return "AUTO"
+    if override == "FORCE_IF_PRESENT":
+        return "IF_PRESENT"
+    # USE_MESH
+    return getattr(getattr(src_mesh, "i3d_attributes", None), "color_export", "AUTO")

@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 import bpy
 
 from ...ir import NodeKind
-from ...model.shapes import ShapeVariant
-from ...shapes import ShapeMode
+from ...model.shapes import ShapeMode
 from .. import ShapeContributor
 
 if TYPE_CHECKING:
@@ -97,7 +96,6 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
             root_obj=root_obj,
             name=mg_label,
             mode=ShapeMode.MERGE_GROUP,
-            variant=ShapeVariant.MERGE_GROUP,
             merge_group_index=mg_index,
         )
         entry.enable_bind_index()

@@ -7,8 +7,7 @@ import bpy
 import mathutils
 
 from ...ir import NodeKind, SourceKind, set_kind
-from ...model.shapes import ShapeVariant
-from ...shapes import ShapeMode
+from ...model.shapes import ShapeMode
 from .. import ShapeContributor
 
 if TYPE_CHECKING:
@@ -63,8 +62,7 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
         entry = ctx.shapes.add_merge_shape(
             root_obj=obj,
             name=obj.name,
-            mode=ShapeMode.MERGE_CHILDREN_GENERIC,
-            variant=ShapeVariant.MERGE_CHILDREN,
+            mode=ShapeMode.MERGE_CHILDREN,
         )
         entry.enable_generic_value01()
         for mesh_obj, ref_frame, g in contributors:

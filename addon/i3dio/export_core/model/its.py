@@ -49,7 +49,6 @@ class BuiltITS:
     indices: ArrI = field(repr=False)  # (K,) int32/uint32, flattened
 
     subsets: list[BuiltSubset]
-    material_ids: list[int]  # material keys in subset order (see material_kind)
 
     # Optional/variable
     uvs: list[Vec2f] = field(repr=False, default_factory=list)  # 0..4, each (N,2) float32
@@ -65,31 +64,14 @@ class BuiltITS:
     attrs: EmitAttrs = field(default_factory=EmitAttrs)
 
     @property
+    def material_ids(self) -> list[int]:
+        """Material keys in subset order (see material_kind)."""
+        return [s.material_id for s in self.subsets]
+
+    @property
     def vertex_count(self) -> int:
         return int(self.positions.shape[0])
 
     @property
     def triangle_count(self) -> int:
         return int(self.indices.shape[0] // 3)
-
-
-@dataclass(slots=True)
-class ItsContributorStream:
-    obj_name: str
-    loop_count: int
-
-    positions: np.ndarray  # (L,3) float32
-    normals: np.ndarray  # (L,3) float32 (mandatory)
-    uvs: list[np.ndarray]  # 0..4 each (L,2) float32
-    want_color_attr: bool
-    color: np.ndarray | None  # (L,4) float32 RGBA
-
-    tri_loops: np.ndarray  # (T,3) int32, loop indices
-    tri_mat_id: np.ndarray  # (T,) int32, material key per tri (see BuiltITS.material_kind)
-
-    generic_value01: np.ndarray | None  # (L,) float32
-    bind_idx: np.ndarray | None  # (L,) int32 (or float32 if writer expects float)
-
-    # Skinned mesh: (L,4)
-    blend_weights: np.ndarray | None = None  # float32
-    blend_indices: np.ndarray | None = None  # int32

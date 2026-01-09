@@ -1,15 +1,15 @@
-from .its import BuiltITS, BuiltSubset, ItsContributorStream, MaterialKeyKind
+from .its import BuiltITS, BuiltSubset, MaterialKeyKind
 from .materials import MaterialEntry, MaterialKey
-from .shapes import ShapeEntry, ShapeKey, ShapeVariant
+from .shapes import ShapeContributor, ShapeEntry, ShapeKey, ShapeMode
 
 __all__ = [
     "BuiltITS",
     "BuiltSubset",
-    "ItsContributorStream",
     "MaterialEntry",
     "MaterialKey",
     "MaterialKeyKind",
+    "ShapeContributor",
     "ShapeEntry",
     "ShapeKey",
-    "ShapeVariant",
+    "ShapeMode",
 ]

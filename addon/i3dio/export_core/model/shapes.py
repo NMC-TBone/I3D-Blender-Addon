@@ -2,40 +2,89 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import TYPE_CHECKING, Literal
+from enum import Enum, auto
+
+import bpy
+import mathutils
 
 from ..ir import EmitAttrs
 
-if TYPE_CHECKING:
-    from ..shapes import ShapeContributor, ShapeMode
 
-ShapeKind = Literal["IndexedTriangleSet", "NurbsCurve"]
+class ShapeMode(Enum):
+    """How the shape is built and keyed for deduplication."""
+
+    NORMAL = auto()  # Single mesh, keyed by datablock
+    MERGE_GROUP = auto()  # Multiple meshes merged, keyed by root object
+    MERGE_CHILDREN = auto()  # Children merged with generic values
+    SKINNED_MESH = auto()  # Armature-driven, keyed per object
 
 
-class ShapeVariant(StrEnum):
-    """Disambiguator for synthetic shapes that don't map 1:1 to a datablock."""
+@dataclass(slots=True)
+class ShapeContributor:
+    obj: bpy.types.Object
+    reference_frame: mathutils.Matrix | None  # Blender-space frame
 
-    NORMAL = "NORMAL"
-    MERGE_CHILDREN = "MERGE_CHILDREN"
-    MERGE_GROUP = "MERGE_GROUP"
-    SKINNED_MESH = "SKINNED_MESH"
+    generic_value01: float | None = None  # MergeChildren normalized [0..1]
+    bind_index: int | None = None  # MergeGroup 0..N-1
+    skin_vgroup_to_bind_index: dict[int, int] | None = None  # Skinned mesh vgroup -> bind index
 
 
 @dataclass(frozen=True, slots=True)
 class ShapeKey:
-    kind: ShapeKind
-    data_ptr: int  # mesh/curve datablock pointer
-    object_ptr: int  # object pointer (for modifier-applied shapes)
-    apply_modifiers: bool
-    # Only used as part of the table key (caching/dedup) so synthetic shapes
-    # (which often have data_ptr=0) don't collide with each other.
-    variant: ShapeVariant = ShapeVariant.NORMAL
-    merge_group_index: int | None = None
+    """Deduplication key for shapes. Use factory methods for construction."""
 
-    # Optional material slot name signature used for NORMAL shapes when exporting Subset@materialSlotName
-    # to ensure e.g. linked duplicates with different slot names get unique ShapeEntries.
+    data_ptr: int
+    object_ptr: int
+    apply_modifiers: bool
+    mode: ShapeMode = ShapeMode.NORMAL
+    merge_group_index: int | None = None
     slot_name_signature: tuple[str | None, ...] | None = None
+
+    @classmethod
+    def for_mesh(
+        cls,
+        *,
+        data_ptr: int,
+        object_ptr: int,
+        apply_modifiers: bool,
+        slot_name_signature: tuple[str | None, ...] | None = None,
+    ) -> "ShapeKey":
+        """Key for a normal mesh shape."""
+        return cls(
+            data_ptr=data_ptr,
+            object_ptr=object_ptr,
+            apply_modifiers=apply_modifiers,
+            mode=ShapeMode.NORMAL,
+            slot_name_signature=slot_name_signature,
+        )
+
+    @classmethod
+    def for_merge(
+        cls,
+        *,
+        object_ptr: int,
+        apply_modifiers: bool,
+        mode: ShapeMode,
+        merge_group_index: int | None = None,
+    ) -> "ShapeKey":
+        """Key for a merged shape (MERGE_GROUP or MERGE_CHILDREN)."""
+        return cls(
+            data_ptr=0,
+            object_ptr=object_ptr,
+            apply_modifiers=apply_modifiers,
+            mode=mode,
+            merge_group_index=merge_group_index,
+        )
+
+    @classmethod
+    def for_skinned(cls, *, data_ptr: int, object_ptr: int, apply_modifiers: bool) -> "ShapeKey":
+        """Key for a skinned mesh shape."""
+        return cls(
+            data_ptr=data_ptr,
+            object_ptr=object_ptr,
+            apply_modifiers=apply_modifiers,
+            mode=ShapeMode.SKINNED_MESH,
+        )
 
 
 @dataclass(slots=True)
@@ -43,22 +92,30 @@ class ShapeEntry:
     id: int
     key: ShapeKey
     name: str
-    mode: "ShapeMode"
-    contributors: list["ShapeContributor"] = field(default_factory=list)
+    contributors: list[ShapeContributor] = field(default_factory=list)
     attrs: EmitAttrs = field(default_factory=EmitAttrs)
 
-    want_generic_value01: bool = False  # MergeChildren "g"
-    want_bind_index: bool = False  # MergeGroup / skinned mesh "bi"
-    want_skin_weights: bool = False  # Skinned mesh multi-weight (bw/bi)
+    @property
+    def mode(self) -> ShapeMode:
+        return self.key.mode
+
+    @property
+    def want_generic_value01(self) -> bool:
+        return self.attrs.children.get("Vertices", {}).get("generic", False)
+
+    @property
+    def want_bind_index(self) -> bool:
+        return self.attrs.children.get("Vertices", {}).get("singleblendweights", False)
+
+    @property
+    def want_skin_weights(self) -> bool:
+        return self.attrs.children.get("Vertices", {}).get("blendweights", False)
 
     def enable_generic_value01(self) -> None:
-        self.want_generic_value01 = True
         self.attrs.children.setdefault("Vertices", {})["generic"] = True
 
     def enable_bind_index(self) -> None:
-        self.want_bind_index = True
         self.attrs.children.setdefault("Vertices", {})["singleblendweights"] = True
 
     def enable_skin_weights(self) -> None:
-        self.want_skin_weights = True
         self.attrs.children.setdefault("Vertices", {})["blendweights"] = True

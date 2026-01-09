@@ -5,8 +5,8 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from ...ir import NodeKind, SceneNode, clear_shape_binding, to_transform_group
-from ..its import MaterialKeyKind
-from ..its.material_resolve import resolve_slots
+from ...model.its import MaterialKeyKind
+from ..material_resolve import resolve_slots
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
@@ -78,7 +78,7 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
 
     # Safety invariant: non-shape nodes must not carry shape bindings
     for node in ctx.ir.iter_nodes(emitted_only=True):
-        if node.kind != NodeKind.SHAPE:
+        if node.kind is not NodeKind.SHAPE:
             clear_shape_binding(node)
 
     if not shape_nodes_by_id:
