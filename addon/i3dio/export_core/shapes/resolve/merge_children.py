@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Iterable
 import bpy
 import mathutils
 
+from ....utility import sort_blender_objects_by_outliner_ordering
 from ...ir import NodeKind, SourceKind, set_kind
 from ...model.shapes import ShapeMode
 from .. import ShapeContributor
@@ -59,11 +60,7 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
             continue
 
         # Create synthetic merged shape entry
-        entry = ctx.shapes.add_merge_shape(
-            root_obj=obj,
-            name=obj.name,
-            mode=ShapeMode.MERGE_CHILDREN,
-        )
+        entry = ctx.shapes.add_merge_shape(root_obj=obj, name=obj.name, mode=ShapeMode.MERGE_CHILDREN)
         entry.enable_generic_value01()
         for mesh_obj, ref_frame, g in contributors:
             entry.contributors.append(ShapeContributor(mesh_obj, ref_frame, generic_value01=g))
@@ -84,7 +81,7 @@ def _collect_contributors(
     out: list[tuple[bpy.types.Object, mathutils.Matrix, float]] = []
 
     g_idx = 0
-    for top_child in root_obj.children:
+    for top_child in sort_blender_objects_by_outliner_ordering(root_obj.children):
         g = min(g_idx, _MAX_G) / _MAX_G
         ref_frame = root_world if apply_transforms else top_child.matrix_world.copy()
 

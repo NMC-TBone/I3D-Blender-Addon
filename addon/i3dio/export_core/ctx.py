@@ -70,7 +70,7 @@ class ExportContext:
         scene: bpy.types.Scene,
         conversion_matrix: mathutils.Matrix,
         settings: dict,
-    ) -> "ExportContext":
+    ) -> ExportContext:
         i3d_path = Path(filepath)
         ctx = cls(
             name=bpy.path.display_name_from_filepath(str(i3d_path)),

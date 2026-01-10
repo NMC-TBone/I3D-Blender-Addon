@@ -36,8 +36,9 @@ class ItsContributorStream:
     tri_loops: np.ndarray  # (T,3) int32, loop indices
     tri_mat_id: np.ndarray  # (T,) int32, material key per tri
 
-    # NOTE: these are scalars; merge can broadcast to slice (cheaper than per-loop arrays)
-    generic_value01: float | None
+    # Generic value: per-loop array (from attribute or broadcast scalar) None means "not wanted/not present"
+    generic: np.ndarray | None
+
     bind_idx: int | None
 
     # Skinned mesh: (L,4)
@@ -136,8 +137,12 @@ def extract_contrib_its(
             layer.data.foreach_get("color_srgb", colors_srgb.ravel())
             color = colors_srgb[loop_vert_idx] if is_point else colors_srgb
 
-        # ---- constant features (scalars, broadcast later) ----
-        generic_value01 = float(contrib.generic_value01 or 0.0) if want_g else None
+        # ---- generic value (attribute auto-detect OR scalar from contributor) ----
+        generic = _extract_generic(
+            mesh, num_loops, len_verts, loop_vert_idx, want_g=want_g, scalar_fallback=contrib.generic_value01
+        )
+
+        # ---- Merge Group bind idx ----
         bind_idx = int(contrib.bind_index or 0) if want_bi else None
 
         # ---- skin weights (optional) ----
@@ -157,7 +162,7 @@ def extract_contrib_its(
             color=color,
             tri_loops=tri_loops,
             tri_mat_id=tri_mat_key,
-            generic_value01=generic_value01,
+            generic=generic,
             bind_idx=bind_idx,
             blend_weights=blend_weights,
             blend_indices=blend_indices,
@@ -253,6 +258,38 @@ def _resolve_tri_material_keys(
     tri_mat_key[valid] = res.slot_ids[tri_mat_idx[valid]]
     tri_mat_key[~valid] = fallback_id
     return tri_mat_key
+
+
+def _extract_generic(
+    mesh: bpy.types.Mesh,
+    num_loops: int,
+    len_verts: int,
+    loop_vert_idx: np.ndarray,
+    *,
+    want_g: bool,
+    scalar_fallback: float | None,
+) -> np.ndarray | None:
+    """
+    Extract generic value per loop.
+
+    Priority:
+    1. If mesh has a 'generic' float attribute (geometry nodes) -> use it
+    2. Elif want_g and scalar_fallback is set -> broadcast scalar to all loops
+    3. Else -> None (no generic channel)
+    """
+    # Check for geometry nodes 'generic' attribute (auto-detect)
+    if (generic_attr := mesh.attributes.get("generic")) is not None and generic_attr.data_type == 'FLOAT':
+        is_point = generic_attr.domain == "POINT"
+        src_len = len_verts if is_point else num_loops
+        values = np.empty(src_len, dtype=np.float32)
+        generic_attr.data.foreach_get("value", values)
+        return values[loop_vert_idx] if is_point else values
+
+    # Fallback to scalar (MergeChildren provides this)
+    if want_g and scalar_fallback is not None:
+        return np.full(num_loops, scalar_fallback, dtype=np.float32)
+
+    return None
 
 
 def _effective_color_export_mode(ctx: "ExportContext", src_mesh: bpy.types.Mesh) -> str:

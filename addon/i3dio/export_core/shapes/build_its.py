@@ -73,7 +73,7 @@ class _MergedArrays:
         if self.color is not None:
             self.color[vs] = s.color if s.color is not None else 0.0
         if self.g is not None:
-            self.g[vs] = s.generic_value01 if s.generic_value01 is not None else 0.0
+            self.g[vs] = s.generic if s.generic is not None else 0.0
         if self.bi is not None:
             self.bi[vs] = s.bind_idx if s.bind_idx is not None else 0
         if self.bw is not None and self.bi4 is not None:
@@ -91,7 +91,7 @@ class _MergedArrays:
         self._t_offset += tc
 
 
-def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> BuiltITS | None:
+def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltITS | None:
     """Build an IndexedTriangleSet from shape entry contributors."""
     if not entry.contributors:
         return None
@@ -116,6 +116,10 @@ def build_indexed_triangle_set(ctx: "ExportContext", entry: ShapeEntry) -> Built
     ]
     if not streams:
         return None
+
+    # Ensure generic attribute is enabled if detected in any stream (when NORMAL shape have e.g. Geometry Nodes)
+    if entry.mode == ShapeMode.NORMAL:
+        entry.enable_generic_value01_if_detected(streams)
 
     total_verts = sum(s.loop_count for s in streams)
     total_tris = sum(s.tri_loops.shape[0] for s in streams)
