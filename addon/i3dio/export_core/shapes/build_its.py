@@ -122,6 +122,9 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
     if entry.mode == ShapeMode.NORMAL:
         entry.enable_generic_value01_if_detected(streams)
 
+    if any(s.needs_tangent for s in streams):
+        entry.enable_tangent()
+
     total_verts = sum(s.loop_count for s in streams)
     total_tris = sum(s.tri_loops.shape[0] for s in streams)
     if total_verts <= 0 or total_tris <= 0:

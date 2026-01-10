@@ -8,6 +8,7 @@ import bpy
 import numpy as np
 
 from ..blender.evaluated_mesh import evaluated_mesh_for_export, free_evaluated_mesh
+from ..blender.materials import material_requires_tangents
 from ..model.its import MaterialKeyKind
 from ..model.shapes import ShapeContributor
 from .material_resolve import materials_requiring_vcol, resolve_slots
@@ -44,6 +45,8 @@ class ItsContributorStream:
     # Skinned mesh: (L,4)
     blend_weights: np.ndarray | None = None  # (L,4) float32
     blend_indices: np.ndarray | None = None  # (L,4) int32
+
+    needs_tangent: bool = False
 
 
 def extract_contrib_its(
@@ -166,6 +169,7 @@ def extract_contrib_its(
             bind_idx=bind_idx,
             blend_weights=blend_weights,
             blend_indices=blend_indices,
+            needs_tangent=any(material_requires_tangents(m) for m in slot_materials if m is not None),
         )
 
     finally:

@@ -113,7 +113,7 @@ class ShapeEntry:
         return self.attrs.children.get("Vertices", {}).get("blendweights", False)
 
     def enable_tangent(self) -> None:
-        self.attrs.node.setdefault("tangent", True)
+        self.attrs.children.setdefault("Vertices", {})["tangent"] = True
 
     def enable_generic_value01(self) -> None:
         self.attrs.children.setdefault("Vertices", {})["generic"] = True
