@@ -13,6 +13,7 @@ from .names import finalize_name_for_node
 from .properties import resolve_material_properties, resolve_properties
 from .shapes import (
     finalize_shape_material_ids,
+    resolve_bounding_volumes,
     resolve_merge_children,
     resolve_merge_groups,
     resolve_shape_links,
@@ -49,6 +50,7 @@ def resolve_all(ctx: "ExportContext") -> None:
     resolve_merge_groups(ctx)
     resolve_skinned_meshes(ctx)
     resolve_shape_links(ctx)
+    resolve_bounding_volumes(ctx)
 
     # Phase 3: Per-node properties (structure is now stable)
     for node in ctx.ir.scene_nodes.values():
@@ -57,6 +59,7 @@ def resolve_all(ctx: "ExportContext") -> None:
     # Phase 4: Shape & material finalization
     valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)
+
     for m in ctx.materials.entries():
         resolve_material_properties(ctx, m)
         resolve_material_shading(ctx, m)
