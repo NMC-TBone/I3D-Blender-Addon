@@ -22,8 +22,8 @@ class MaterialEntry:
     attrs: EmitAttrs = field(default_factory=EmitAttrs)
     extra_children: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
-    def has_normalmap(self) -> bool:
-        """Return True if this material has a Normalmap child element queued for export."""
+    def requires_tangents(self) -> bool:
+        """Return True if tangent export is required for this material."""
         return "Normalmap" in self.attrs.children
 
     def get_slot_name(self) -> str | None:

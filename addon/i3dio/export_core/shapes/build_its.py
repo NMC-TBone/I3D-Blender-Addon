@@ -13,6 +13,7 @@ from .subsets import build_indices_and_subsets
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
+    from ..model.its import BuiltSubset
     from ..model.shapes import ShapeEntry
 
 
@@ -165,7 +166,9 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
     )
 
 
-def _resolve_subset_slot_names(ctx, entry, subsets, material_kind) -> None:
+def _resolve_subset_slot_names(
+    ctx: ExportContext, entry: ShapeEntry, subsets: list[BuiltSubset], material_kind: MaterialKeyKind
+) -> None:
     """Set material_slot_name on each subset based on material resolution mode."""
     if material_kind == MaterialKeyKind.MATERIAL_ID:
         for subset in subsets:
