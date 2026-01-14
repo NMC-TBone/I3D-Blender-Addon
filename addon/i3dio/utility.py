@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import math
 import os
 import re
@@ -11,8 +10,6 @@ from pathlib import Path
 import bpy
 import mathutils
 from idprop.types import IDPropertyArray
-
-logger = logging.getLogger(__name__)
 
 BlenderRef = bpy.types.Object | bpy.types.Collection
 
@@ -145,10 +142,6 @@ def as_export_path(filepath: str) -> Path:
         return target_path  # Happens if on another drive
 
 
-def sort_blender_objects_by_name(objects: list[BlenderRef]) -> list[BlenderRef]:
-    return sorted(objects, key=lambda x: x.name)
-
-
 """
 Blenders outliner does not follow a stricly lexographical ordering, but rather what is called a "natural" ordering.
 This function implements the same ordering as per:
@@ -156,11 +149,10 @@ https://github.com/blender/blender/blob/b0e7a6db56caf6669b6fade1622710d70b96483e
 with the use of a regex as detailed in this answer on stackoverflow https://stackoverflow.com/a/16090640
 """
 
-_SPLIT_NUM = re.compile(r"(\d+)")
-
 
 def sort_blender_objects_by_outliner_ordering(objects: list[BlenderRef]) -> list[BlenderRef]:
-    return sorted(objects, key=lambda s: [int(t) if t.isdigit() else t.lower() for t in _SPLIT_NUM.split(s.name)])
+    _split_num = re.compile(r"(\d+)")
+    return sorted(objects, key=lambda s: [int(t) if t.isdigit() else t.lower() for t in _split_num.split(s.name)])
 
 
 def get_fs_data_path(as_path: bool = False) -> str | Path:

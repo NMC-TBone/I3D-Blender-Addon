@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 # Public constants / types
 XML_Element = ET.Element
 FILE_EXT = ".i3d"
-MERGE_GROUP_PREFIX = "MergedMesh_"
-SKINNED_MESH_PREFIX = "SkinnedMesh_"
 I3D_MAX = 3.40282e38
 
 
