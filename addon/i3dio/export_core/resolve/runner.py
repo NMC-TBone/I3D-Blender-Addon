@@ -5,6 +5,7 @@ from collections import Counter
 from typing import TYPE_CHECKING
 
 from .armatures import resolve_armatures
+from .child_of_constraint import resolve_bone_childof
 from .kinds import resolve_kind_for_node
 from .mappings import collect_i3d_mappings
 from .materials import resolve_material_shading
@@ -47,6 +48,8 @@ def resolve_all(ctx: ExportContext) -> None:
 
     # Phase 2: Structural transforms
     resolve_armatures(ctx)
+    resolve_bone_childof(ctx)
+
     resolve_merge_children(ctx)
     resolve_merge_groups(ctx)
     resolve_skinned_meshes(ctx)

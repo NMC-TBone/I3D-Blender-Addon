@@ -221,7 +221,19 @@ class ExportIR:
         return result
 
     def attach(self, node_id: int, parent_id: int | None) -> None:
-        """Change a node's parent (reparent operation)."""
+        """Change a node's parent (reparent operation). No-op if the parent is unchanged or would create a cycle."""
+        if parent_id == node_id:
+            return
+
+        pid = parent_id
+        while pid is not None:
+            if pid == node_id:
+                return  # cycle detected
+            p = self.scene_nodes.get(pid)
+            if p is None:
+                break
+            pid = p.parent_id
+
         n = self.scene_nodes[node_id]
         if n.parent_id == parent_id:
             return
