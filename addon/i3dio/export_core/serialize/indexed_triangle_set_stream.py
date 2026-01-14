@@ -18,8 +18,8 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     color = built.color
     g = built.g
     bi = built.bi
-    bw = getattr(built, "bw", None)
-    bi4 = getattr(built, "bi4", None)
+    bw = built.bw
+    bi4 = built.bi4
     indices = built.indices
 
     vcount = int(positions.shape[0])

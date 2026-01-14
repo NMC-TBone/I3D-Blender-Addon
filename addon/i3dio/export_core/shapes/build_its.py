@@ -119,11 +119,8 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
         return None
 
     # Ensure generic attribute is enabled if detected in any stream (when NORMAL shape have e.g. Geometry Nodes)
-    if entry.mode == ShapeMode.NORMAL:
-        entry.enable_generic_value01_if_detected(streams)
-
-    if any(s.needs_tangent for s in streams):
-        entry.enable_tangent()
+    if entry.mode == ShapeMode.NORMAL and any(s.generic is not None for s in streams):
+        entry.enable_generic_value01()
 
     total_verts = sum(s.loop_count for s in streams)
     total_tris = sum(s.tri_loops.shape[0] for s in streams)
@@ -135,7 +132,7 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
         total_verts=total_verts,
         total_tris=total_tris,
         max_uvs=min(max((len(s.uvs) for s in streams), default=0), 4),
-        want_color=any(s.want_color_attr for s in streams),
+        want_color=any(s.color is not None for s in streams),
         want_g=entry.want_generic_value01,
         want_bi=entry.want_bind_index,
         want_skin=entry.want_skin_weights,

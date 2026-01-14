@@ -24,20 +24,21 @@ class MaterialEntry:
 
     def requires_tangents(self) -> bool:
         """Return True if tangent export is required for this material."""
-        return "Normalmap" in self.attrs.children
+        if (mat := self.blender_material) is None:
+            return False
+        req_attrs = mat.i3d_attributes.required_vertex_attributes
+        return "Normalmap" in self.attrs.children or any(req.name == "tangent" for req in req_attrs)
+
+    def requires_vcol(self) -> bool:
+        """Return True if this material requires vertex colors."""
+        if (mat := self.blender_material) is None:
+            return False
+        return any("color" in attr.name.lower() for attr in mat.i3d_attributes.required_vertex_attributes)
 
     def get_slot_name(self) -> str | None:
         """Return the optional materialSlotName (or None if disabled)."""
-        mat = self.blender_material
-        if mat is None or not isinstance(mat, bpy.types.Material):
+        if (mat := self.blender_material) is None:
             return None
         if mat.i3d_attributes.use_material_slot_name:
             return mat.i3d_attributes.material_slot_name or mat.name
         return None
-
-    def get_require_vcol(self) -> bool:
-        """Return True if this material requires vertex colors."""
-        mat = self.blender_material
-        if mat is None or not isinstance(mat, bpy.types.Material):
-            return False
-        return any("color" in attr.name.lower() for attr in mat.i3d_attributes.required_vertex_attributes)

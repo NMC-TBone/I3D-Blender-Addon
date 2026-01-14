@@ -17,6 +17,7 @@ from .shapes import (
     resolve_merge_children,
     resolve_merge_groups,
     resolve_shape_links,
+    resolve_shape_vertex_requirements,
     resolve_shapes_build,
     resolve_skinned_meshes,
 )
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
     from ..ctx import ExportContext
 
 
-def resolve_all(ctx: "ExportContext") -> None:
+def resolve_all(ctx: ExportContext) -> None:
     """
     Apply IR resolve/finalize passes after traversal and before serialization.
 
@@ -63,6 +64,8 @@ def resolve_all(ctx: "ExportContext") -> None:
     for m in ctx.materials.entries():
         resolve_material_properties(ctx, m)
         resolve_material_shading(ctx, m)
+
+    resolve_shape_vertex_requirements(ctx, valid_shapes)
 
     # Phase 5: Final passes
     resolve_matrices(ctx)

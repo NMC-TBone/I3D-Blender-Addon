@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Iterable
 
 import bpy
 import mathutils
@@ -117,12 +116,6 @@ class ShapeEntry:
 
     def enable_generic_value01(self) -> None:
         self.attrs.children.setdefault("Vertices", {})["generic"] = True
-
-    def enable_generic_value01_if_detected(self, streams: Iterable[object]) -> None:
-        if self.want_generic_value01:
-            return
-        if any(getattr(s, "generic", None) is not None for s in streams):
-            self.enable_generic_value01()
 
     def enable_bind_index(self) -> None:
         self.attrs.children.setdefault("Vertices", {})["singleblendweights"] = True

@@ -8,15 +8,12 @@ import bpy
 import numpy as np
 
 from ..blender.evaluated_mesh import evaluated_mesh_for_export, free_evaluated_mesh
-from ..blender.materials import material_requires_tangents
 from ..model.its import MaterialKeyKind
 from ..model.shapes import ShapeContributor
-from .material_resolve import materials_requiring_vcol, resolve_slots
+from .material_resolve import resolve_slots
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
-
-MAX_UV_LAYERS = 4
 
 
 @dataclass(slots=True)
@@ -30,8 +27,6 @@ class ItsContributorStream:
     normals: np.ndarray  # (L,3) float32
     uvs: list[np.ndarray]  # 0..4 each (L,2) float32
 
-    # Vertex color export decision for THIS contributor (not the final merged ITS)
-    want_color_attr: bool
     color: np.ndarray | None  # (L,4) float32 RGBA (only present if extracted)
 
     tri_loops: np.ndarray  # (T,3) int32, loop indices
@@ -45,8 +40,6 @@ class ItsContributorStream:
     # Skinned mesh: (L,4)
     blend_weights: np.ndarray | None = None  # (L,4) float32
     blend_indices: np.ndarray | None = None  # (L,4) int32
-
-    needs_tangent: bool = False
 
 
 def extract_contrib_its(
@@ -88,7 +81,7 @@ def extract_contrib_its(
         uv_layers = list(mesh.uv_layers)
         if ctx.setting("alphabetic_uvs", False):
             uv_layers.sort(key=lambda ul: ul.name.casefold())
-        uv_layers = uv_layers[:MAX_UV_LAYERS]
+        uv_layers = uv_layers[:4]
 
         uvs: list[np.ndarray] = []
         for ul in uv_layers:
@@ -114,25 +107,9 @@ def extract_contrib_its(
         # ---- material keys per tri ----
         tri_mat_key = _resolve_tri_material_keys(ctx, obj, tri_mat_idx, slot_materials, material_kind, num_triangles)
 
-        # ---- vertex colors (decide first, then read only if needed) ----
-        mode = _effective_color_export_mode(ctx, obj.data)
-        has_vcol = bool(mesh.color_attributes)
-
-        if mode == "AUTO":
-            mats_need = materials_requiring_vcol(slot_materials)
-            want_color_attr = bool(mats_need)
-            if want_color_attr and not has_vcol:
-                ctx.object_reporter(obj, "vertex_colors").warning(
-                    "Vertex color attribute is required by material(s): %s, but this mesh has no vertex color layer. "
-                    "Export will pad zeros. Add/paint a vertex color layer or switch color export mode.",
-                    ", ".join(mats_need),
-                    code="vertex_color_missing_required",
-                )
-        else:  # "IF_PRESENT"
-            want_color_attr = has_vcol
-
+        # ---- vertex colors ----
         color = None
-        if want_color_attr and has_vcol:
+        if mesh.color_attributes:
             layer = mesh.color_attributes.active_color or mesh.color_attributes[0]
             is_point = layer.domain == "POINT"
             src_len = len_verts if is_point else num_loops
@@ -161,7 +138,6 @@ def extract_contrib_its(
             positions=positions,
             normals=normals,
             uvs=uvs,
-            want_color_attr=want_color_attr,
             color=color,
             tri_loops=tri_loops,
             tri_mat_id=tri_mat_key,
@@ -169,7 +145,6 @@ def extract_contrib_its(
             bind_idx=bind_idx,
             blend_weights=blend_weights,
             blend_indices=blend_indices,
-            needs_tangent=any(material_requires_tangents(m) for m in slot_materials if m is not None),
         )
 
     finally:
@@ -294,13 +269,3 @@ def _extract_generic(
         return np.full(num_loops, scalar_fallback, dtype=np.float32)
 
     return None
-
-
-def _effective_color_export_mode(ctx: "ExportContext", src_mesh: bpy.types.Mesh) -> str:
-    override = ctx.setting("vertex_color_override", "USE_MESH")
-    if override == "FORCE_AUTO":
-        return "AUTO"
-    if override == "FORCE_IF_PRESENT":
-        return "IF_PRESENT"
-    # USE_MESH
-    return getattr(getattr(src_mesh, "i3d_attributes", None), "color_export", "AUTO")
