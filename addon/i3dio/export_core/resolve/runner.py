@@ -87,18 +87,12 @@ def resolve_all(ctx: ExportContext) -> None:
     _log_summary(ctx, rep)
 
 
-def _resolve_phase4_finalize(ctx: ExportContext) -> None:
+def _finalize_shapes_and_materials(ctx: ExportContext) -> None:
     # Shape build & materialIds must run before material resolve and shape vertex reqs after material resolve
     valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)
     resolve_material_entries(ctx)
     resolve_shape_vertex_requirements(ctx, valid_shapes)
-
-
-def _resolve_phase5_final(ctx: ExportContext) -> None:
-    resolve_matrices(ctx)
-    collect_i3d_mappings(ctx)
-    resolve_files(ctx)
 
 
 _PHASES: tuple[ResolvePhase, ...] = (
@@ -127,11 +121,15 @@ _PHASES: tuple[ResolvePhase, ...] = (
     ),
     ResolvePhase(
         "finalize",
-        (ResolvePass("build_shapes_then_materials_then_reqs", _resolve_phase4_finalize),),
+        (ResolvePass("build_shapes_then_materials_then_reqs", _finalize_shapes_and_materials),),
     ),
     ResolvePhase(
         "final",
-        (ResolvePass("final_passes", _resolve_phase5_final),),
+        (
+            ResolvePass("matrices", resolve_matrices),
+            ResolvePass("mappings", collect_i3d_mappings),
+            ResolvePass("files", resolve_files),
+        ),
     ),
 )
 
