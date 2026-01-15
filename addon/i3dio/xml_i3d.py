@@ -126,7 +126,7 @@ def add_indentations(elem: ET.Element, level: int = 0) -> None:
             if not child.tail or not child.tail.strip():
                 child.tail = i + _INDENT  # indent siblings under this parent
 
-        # IMPORTANT: last child tail should align the closing tag of the parent
+        # NOTE: last child tail should align the closing tag of the parent
         if not elem[-1].tail or not elem[-1].tail.strip():
             elem[-1].tail = i
     else:
