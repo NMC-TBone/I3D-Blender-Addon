@@ -77,13 +77,13 @@ def resolve_merge_groups(ctx: ExportContext) -> None:
         ordered = list(dict.fromkeys([root_node_id, *node_ids]))
 
         if len(ordered) == 1:
-            ctx.object_reporter(root_obj, "merge_group").warning(
+            obj_rep.warning(
                 "MergeGroup %r only contains the root (no member bind nodes). Remove the MergeGroup or add members.",
                 mg_label,
                 code="merge_group_single_bind_node",
             )
         elif len(ordered) > MAX_BIND_NODES:
-            ctx.object_reporter(root_obj, "merge_group").warning(
+            obj_rep.warning(
                 "MergeGroup %r has %d bind nodes. Recommended maximum is %d; split into multiple MergeGroups.",
                 mg_label,
                 len(ordered),

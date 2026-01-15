@@ -1,20 +1,15 @@
 # i3dio/export_core/registries/files.py
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-import bpy
-
-from ... import utility
 from ..ids import IdKind
 from .base import IdEntryTable
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
-    from ..reporting import Reporter
 
 
 FileKind = Literal["image", "shader", "reference", "generic"]
@@ -68,126 +63,3 @@ class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
 
     def add_shader(self, blender_path: str) -> int:
         return self.add(kind="shader", blender_path=blender_path)
-
-    # finalize / resolve / copy
-
-    def finalize(self) -> None:
-        """
-        Resolve all registered file paths and copy them if requested.
-
-        This is the new equivalent of each File node resolving itself during
-        construction in the old Node hierarchy.
-        """
-        rep = self.ctx.reporter("files")
-        rep.info("Finalizing %d registered files", len(self._entries))
-        for e in self._entries.values():
-            self._resolve_entry(rep, e)
-        rep.info("File finalization complete")
-
-    def _resolve_entry(self, rep: Reporter, e: FileEntry) -> None:
-        """Legacy-equivalent of File._resolve_filepath()"""
-        rep.debug("Resolving file %r of kind %r", e.blender_path, e.kind)
-        e.resolved_path = utility.as_export_path(e.blender_path)
-
-        # FS builtin: $data prefix, never copied
-        if str(e.resolved_path).startswith("$data"):
-            rep.info("Resolved as FS $data path: %s", e.resolved_path)
-            return
-
-        if self.ctx.setting("copy_files", False):
-            self._copy_entry(rep, e)
-            return
-
-        rep.info("Resolved filepath: %s", e.resolved_path)
-        if e.resolved_path.is_absolute():
-            rep.warning("File %r is outside the blend file folder; using absolute path in I3D.", e.blender_path)
-
-    def _copy_entry(self, rep: Reporter, e: FileEntry) -> None:
-        """
-        Legacy-equivalent of File._copy_file()
-
-        Uses settings:
-          - file_structure: FLAT | MODHUB | BLENDER
-          - overwrite_files: bool
-        """
-        i3d_folder = self.ctx.i3d_folder
-        write_directory = i3d_folder
-        resolved_directory = Path()
-
-        rep.info("File is not an FS builtin and will be copied")
-
-        file_structure = self.ctx.setting("file_structure", "MODHUB")
-
-        match file_structure:
-            case "FLAT":
-                rep.debug("Will be copied using the 'FLAT' hierarchy structure")
-                resolved_directory = Path()
-                write_directory = i3d_folder
-
-            case "MODHUB":
-                rep.debug("Will be copied using the 'MODHUB' hierarchy structure")
-                modhub = _MODHUB_FOLDER.get(e.kind, "")
-                resolved_directory = Path(modhub) if modhub else Path()
-                write_directory = i3d_folder / resolved_directory
-
-            case "BLENDER":
-                rep.debug("Will be copied using the 'BLENDER' hierarchy structure")
-
-                # --- ported legacy safety limit ---
-                blender_relative_distance_limit = 3  # Limits the distance a file can be from the blend file
-                blender_path = Path(e.blender_path)
-
-                # Legacy code counted "..\\" only (Windows). Keep that to avoid behavior change.
-                # (If you later want to improve this, do it intentionally with a migration.)
-                if e.blender_path.count("..\\") <= blender_relative_distance_limit:
-                    # Remove relative notation and get the directory path
-                    # (legacy: Path(*blender_path.parts[2:]))
-                    resolved_directory = Path(*blender_path.parts[2:])
-                    write_directory = i3d_folder / resolved_directory
-                else:
-                    rep.debug(
-                        "File exists more than %d folders away from .blend file. "
-                        "Defaulting to absolute path and no copying.",
-                        blender_relative_distance_limit,
-                    )
-                    e.resolved_path = Path(bpy.path.abspath(e.blender_path))
-                    return
-
-            case _:
-                rep.debug("Unknown file_structure=%r; defaulting to 'MODHUB'", file_structure)
-                modhub = _MODHUB_FOLDER.get(e.kind, "")
-                resolved_directory = Path(modhub) if modhub else Path()
-                write_directory = i3d_folder / resolved_directory
-
-        # Destination relative path that will be written into the I3D <File filename="...">
-        file_name = bpy.path.display_name_from_filepath(e.blender_path)
-        file_extension = (
-            e.blender_path[e.blender_path.rfind(".") : len(e.blender_path)] if "." in e.blender_path else ""
-        )
-        e.resolved_path = resolved_directory / f"{file_name}{file_extension}"
-
-        # Ensure we do not overwrite the source file
-        source_path = Path(bpy.path.abspath(e.blender_path))
-        if not source_path.exists():
-            rep.warning("File %r does not exist, cannot copy", source_path)
-            return
-
-        # Legacy had a check comparing resolved_path to source_path, but resolved_path is relative.
-        # The meaningful comparison is full destination vs source.
-        write_path_full = write_directory / f"{file_name}{file_extension}"
-
-        if write_path_full == source_path:
-            rep.debug("Source and destination paths are the same, no need to copy")
-            return
-
-        overwrite_files = self.ctx.setting("overwrite_files", False)
-        if overwrite_files or not write_path_full.exists():
-            write_directory.mkdir(parents=True, exist_ok=True)
-            try:
-                shutil.copy(source_path, write_directory)
-            except shutil.SameFileError:
-                pass  # Ignore if source and destination is the same file
-            else:
-                rep.info("Copied to %r", write_path_full)
-        else:
-            rep.debug("File already in correct path relative to i3d file and overwrite is turned off")

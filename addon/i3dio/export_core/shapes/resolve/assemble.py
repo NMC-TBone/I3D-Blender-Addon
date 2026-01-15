@@ -108,17 +108,12 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
                 [s.material for s in obj.material_slots] if obj.material_slots else list(obj.data.materials)
             )
             res = resolve_slots(ctx, slot_materials=slot_materials)
-            default_id = ctx.materials.get_default_id()
             fallback_id = res.fallback_id if res.fallback_id is not None else default_id
 
-            out_ids: list[int] = []
-            for slot_idx in built.material_ids:
-                if 0 <= slot_idx < len(slot_materials):
-                    out_ids.append(int(res.slot_ids[slot_idx]))
-                else:
-                    out_ids.append(int(fallback_id))
-
-            n.shape.material_ids = out_ids
+            n.shape.material_ids = [
+                int(res.slot_ids[slot_idx]) if 0 <= slot_idx < len(slot_materials) else int(fallback_id)
+                for slot_idx in built.material_ids
+            ]
             wrote_nodes += 1
 
     rep.debug("Finalized materialIds for %d nodes", wrote_nodes)

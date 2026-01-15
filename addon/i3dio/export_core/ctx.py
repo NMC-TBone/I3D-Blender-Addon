@@ -90,6 +90,7 @@ class ExportContext:
         ctx.files = FileTable(ctx)
         ctx.shapes = ShapeTable(ctx)
         ctx.materials = MaterialTable(ctx)
+        ctx.init_settings_cache()
         return ctx
 
     def ctx_logger(

@@ -18,8 +18,13 @@ class SlotResolve:
     fallback_id: int | None
 
 
-def resolve_slots(ctx: "ExportContext", slot_materials: list[bpy.types.Material | None]) -> SlotResolve:
-    fallback_id = choose_fallback_material_id(ctx, slot_materials=slot_materials)
+def resolve_slots(ctx: ExportContext, slot_materials: list[bpy.types.Material | None]) -> SlotResolve:
+    valid = [m for m in slot_materials if m is not None]
+    fallback_id = None
+    if not valid:
+        fallback_id = ctx.materials.get_default_id()
+    elif len(valid) == 1:
+        fallback_id = ctx.materials.get_or_add(valid[0])
     default_id = ctx.materials.get_default_id()
 
     slot_ids = np.empty(len(slot_materials), dtype=np.int32)
@@ -33,16 +38,3 @@ def resolve_slots(ctx: "ExportContext", slot_materials: list[bpy.types.Material 
             slot_ids[i] = fallback_id if fallback_id is not None else default_id
 
     return SlotResolve(slot_ids=slot_ids, slot_has_mat=slot_has_mat, fallback_id=fallback_id)
-
-
-def choose_fallback_material_id(ctx: "ExportContext", *, slot_materials: list[bpy.types.Material | None]) -> int | None:
-    """Return:
-    - int: fallback material id (only when exactly one valid material exists)
-    - None: means 'use default only if needed'
-    """
-    valid = [m for m in slot_materials if m is not None]
-    if not valid:
-        return ctx.materials.get_default_id()
-    if len(valid) == 1:
-        return ctx.materials.get_or_add(valid[0])
-    return None

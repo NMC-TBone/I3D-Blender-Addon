@@ -19,12 +19,6 @@ _OBJECT_TYPE_TO_KIND: dict[str, NodeKind] = {
 }
 
 
-def _allowed_object_type(ctx: ExportContext, obj_type: str) -> bool:
-    if not (allowed := ctx.setting("object_types_to_export", ())):
-        return True  # If setting is missing/empty, allow all types
-    return obj_type in allowed
-
-
 def resolve_kind_for_node(ctx: ExportContext, node: SceneNode) -> None:
     """
     Resolve a traversed OBJECT node's kind.
@@ -34,7 +28,7 @@ def resolve_kind_for_node(ctx: ExportContext, node: SceneNode) -> None:
         return  # already resolved or not an OBJECT
 
     obj_type = node.source_object_type or 'EMPTY'
-    if not _allowed_object_type(ctx, obj_type):
+    if (allowed := ctx.setting("object_types_to_export", ())) and obj_type not in allowed:
         to_transform_group(node)
         return  # Object type excluded by settings, keep as TG to preserve hierarchy.
 

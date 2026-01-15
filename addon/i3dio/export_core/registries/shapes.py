@@ -113,12 +113,9 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
                 yield built
 
 
-def _material_slot_name(mat: bpy.types.Material | None) -> str | None:
-    if mat is None or not mat.i3d_attributes.use_material_slot_name:
-        return None
-    return mat.i3d_attributes.material_slot_name or mat.name
-
-
 def _slot_name_signature(obj: bpy.types.Object) -> tuple[str | None, ...]:
     # canonical per-slot view; includes None slots
-    return tuple(_material_slot_name(ms.material) for ms in obj.material_slots)
+    return tuple(
+        (m.i3d_attributes.material_slot_name or m.name) if m and m.i3d_attributes.use_material_slot_name else None
+        for m in (ms.material for ms in obj.material_slots)
+    )

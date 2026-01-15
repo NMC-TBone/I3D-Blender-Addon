@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import TYPE_CHECKING
+from contextlib import contextmanager
+from dataclasses import dataclass
+from time import perf_counter
+from typing import TYPE_CHECKING, Callable
 
 from .armatures import resolve_armatures
 from .child_of_constraint import resolve_bone_childof
+from .files import resolve_files
 from .kinds import resolve_kind_for_node
 from .mappings import collect_i3d_mappings
-from .materials import resolve_material_shading
+from .materials import resolve_material_entries
 from .matrices import resolve_matrices
 from .names import finalize_name_for_node
-from .properties import resolve_material_properties, resolve_properties
+from .properties import resolve_properties
 from .shapes import (
     finalize_shape_material_ids,
     resolve_bounding_volumes,
@@ -25,57 +29,114 @@ from .shapes import (
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
+    from ..ir import SceneNode
+    from ..reporting import Reporter
+
+
+PassFn = Callable[["ExportContext"], None]
+NodePassFn = Callable[["ExportContext", "SceneNode"], None]
+
+
+def per_node(fn: NodePassFn, *, emitted_only: bool = False) -> PassFn:
+    """Adapt a (ctx, node) pass into a (ctx) pass."""
+
+    def run(ctx: ExportContext) -> None:
+        for node in ctx.ir.iter_nodes(emitted_only=emitted_only):
+            fn(ctx, node)
+
+    run.__name__ = getattr(fn, "__name__", "per_node")
+    return run
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvePass:
+    name: str
+    run: PassFn
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvePhase:
+    name: str
+    passes: tuple[ResolvePass, ...]
+
+
+@contextmanager
+def _timed(rep: Reporter, label: str):
+    t0 = perf_counter()
+    try:
+        yield
+    finally:
+        rep.debug("%s: %.2f ms", label, (perf_counter() - t0) * 1000.0)
 
 
 def resolve_all(ctx: ExportContext) -> None:
-    """
-    Apply IR resolve/finalize passes after traversal and before serialization.
-
-    Phases:
-    1. Per-node basics (kind, name) - must run before structural transforms
-    2. Structural transforms (armatures, merge groups, etc.)
-    3. Per-node properties (after structure is stable)
-    4. Shape/material finalization
-    5. Final passes (matrices, mappings)
-    """
     rep = ctx.reporter("resolve")
     rep.debug("Resolving %d scene nodes", len(ctx.ir.scene_nodes))
 
-    # Phase 1: Node basics (kind & name resolution)
-    for node in ctx.ir.scene_nodes.values():
-        resolve_kind_for_node(ctx, node)
-        finalize_name_for_node(ctx, node)
+    for phase in _PHASES:
+        rep.debug("Resolve phase: %s", phase.name)
+        for p in phase.passes:
+            label = f"{phase.name}.{p.name}"
+            with _timed(rep, label):
+                try:
+                    p.run(ctx)
+                except Exception:
+                    rep.error("Resolve pass failed: %s", label)
+                    raise
 
-    # Phase 2: Structural transforms
-    resolve_armatures(ctx)
-    resolve_bone_childof(ctx)
+    _log_summary(ctx, rep)
 
-    resolve_merge_children(ctx)
-    resolve_merge_groups(ctx)
-    resolve_skinned_meshes(ctx)
-    resolve_shape_links(ctx)
-    resolve_bounding_volumes(ctx)
 
-    # Phase 3: Per-node properties (structure is now stable)
-    for node in ctx.ir.scene_nodes.values():
-        resolve_properties(ctx, node)
-
-    # Phase 4: Shape & material finalization
+def _resolve_phase4_finalize(ctx: ExportContext) -> None:
+    # Shape build & materialIds must run before material resolve and shape vertex reqs after material resolve
     valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)
-
-    for m in ctx.materials.entries():
-        resolve_material_properties(ctx, m)
-        resolve_material_shading(ctx, m)
-
+    resolve_material_entries(ctx)
     resolve_shape_vertex_requirements(ctx, valid_shapes)
 
-    # Phase 5: Final passes
+
+def _resolve_phase5_final(ctx: ExportContext) -> None:
     resolve_matrices(ctx)
     collect_i3d_mappings(ctx)
-    ctx.files.finalize()
+    resolve_files(ctx)
 
-    # Debug summary
+
+_PHASES: tuple[ResolvePhase, ...] = (
+    ResolvePhase(
+        "basics",
+        (
+            ResolvePass("kinds", per_node(resolve_kind_for_node)),
+            ResolvePass("names", per_node(finalize_name_for_node)),
+        ),
+    ),
+    ResolvePhase(
+        "structure",
+        (
+            ResolvePass("armatures", resolve_armatures),
+            ResolvePass("child_of_constraints", resolve_bone_childof),
+            ResolvePass("merge_children", resolve_merge_children),
+            ResolvePass("merge_groups", resolve_merge_groups),
+            ResolvePass("skinned_meshes", resolve_skinned_meshes),
+            ResolvePass("shape_links", resolve_shape_links),
+            ResolvePass("bounding_volumes", resolve_bounding_volumes),
+        ),
+    ),
+    ResolvePhase(
+        "properties",
+        (ResolvePass("node_properties", per_node(resolve_properties)),),
+    ),
+    ResolvePhase(
+        "finalize",
+        (ResolvePass("build_shapes_then_materials_then_reqs", _resolve_phase4_finalize),),
+    ),
+    ResolvePhase(
+        "final",
+        (ResolvePass("final_passes", _resolve_phase5_final),),
+    ),
+)
+
+
+def _log_summary(ctx: ExportContext, rep: Reporter) -> None:
     kinds = Counter(n.kind for n in ctx.ir.iter_nodes(emitted_only=True))
     rep.debug(
         "Resolve summary: emitted=%d/%d mapped=%d kinds=%s",

@@ -107,11 +107,13 @@ def resolve_properties(ctx: "ExportContext", node: SceneNode) -> None:
     ref = node.blender_ref
     if not isinstance(ref, bpy.types.Object):
         return
-    _collect_i3d_attributes(ref, node.attrs)
+    if (pg := getattr(ref, "i3d_attributes", None)) is not None:
+        _collect_pg(ref, pg, node.attrs)
 
     data = getattr(ref, "data", None)
     if data is not None and node.kind in {NodeKind.SHAPE, NodeKind.LIGHT}:
-        _collect_i3d_attributes(data, node.attrs, ctx=ctx, scene_node=node)
+        if (pg := getattr(data, "i3d_attributes", None)) is not None:
+            _collect_pg(data, pg, node.attrs, ctx=ctx, scene_node=node)
     _resolve_reference_path(ctx, node)
 
     if node.kind == NodeKind.CAMERA and isinstance(data, bpy.types.Camera):
@@ -122,20 +124,8 @@ def resolve_material_properties(ctx: "ExportContext", entry: "MaterialEntry") ->
     mat = entry.blender_material
     if not isinstance(mat, bpy.types.Material):
         return
-    _collect_i3d_attributes(mat, entry.attrs)
-
-
-# Small helper to avoid repeating pg lookups
-def _collect_i3d_attributes(
-    owner: Any,
-    out: EmitAttrs,
-    *,
-    ctx: "ExportContext" | None = None,
-    scene_node: "SceneNode" | None = None,
-) -> None:
-    pg = getattr(owner, "i3d_attributes", None)
-    if pg is not None:
-        _collect_pg(owner, pg, out, ctx=ctx, scene_node=scene_node)
+    if (pg := getattr(mat, "i3d_attributes", None)) is not None:
+        _collect_pg(mat, pg, entry.attrs)
 
 
 # Builtins / special cases

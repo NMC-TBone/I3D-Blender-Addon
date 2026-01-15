@@ -31,9 +31,10 @@ def resolve_bone_childof(ctx: ExportContext) -> None:
             continue
 
         target_obj = childof.target
+        obj_rep = ctx.object_reporter(target_obj, "child_of_constraint")
         node_ids = ctx.ir.index.node_id_by_blender_ptr.get(target_obj.as_pointer())
         if not node_ids:
-            ctx.object_reporter(target_obj, "child_of_constraint").warning(
+            obj_rep.warning(
                 "Child Of constraint target %r is not part of the export; cannot reparent bone %r.",
                 target_obj.name,
                 bone_ref.name,
@@ -45,7 +46,7 @@ def resolve_bone_childof(ctx: ExportContext) -> None:
         target_node_id = node_ids[0]  # Use first node if multiple.
 
         if target_node_id == bone_node.id or _is_ancestor(bone_node.id, target_node_id):
-            ctx.object_reporter(target_obj, "child_of_constraint").warning(
+            obj_rep.warning(
                 "Child Of constraint target %r would create a cycle when reparenting bone %r; skipping.",
                 target_obj.name,
                 bone_ref.name,

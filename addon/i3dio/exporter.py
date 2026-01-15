@@ -56,7 +56,6 @@ def export_blend_to_i3d(operator, context: bpy.types.Context, filepath: str, axi
                 settings=settings,
             )
             ctx.addon_pref = context.preferences.addons[__package__].preferences
-            ctx.init_settings_cache()
 
             # Log export settings
             logger.info("Exporter settings:")

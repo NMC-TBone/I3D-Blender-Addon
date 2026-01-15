@@ -20,19 +20,10 @@ def resolve_shape_vertex_requirements(ctx: ExportContext, shape_nodes_by_id: dic
             continue
         entry = ctx.shapes.get_entry(shape_id)
 
-        needs_tangent = False
-        needs_vcol = False
-        vcol_mats = set()
-
-        for node in nodes:
-            mat_ids = node.shape.material_ids
-            for mid in mat_ids:
-                mat = ctx.materials.get_entry(mid)
-                if mat.requires_tangents():
-                    needs_tangent = True
-                if mat.requires_vcol():
-                    needs_vcol = True
-                    vcol_mats.add(mat.key.export_name)
+        mats = [ctx.materials.get_entry(mid) for node in nodes for mid in node.shape.material_ids]
+        needs_tangent = any(m.requires_tangents() for m in mats)
+        vcol_mats = {m.key.export_name for m in mats if m.requires_vcol()}
+        needs_vcol = bool(vcol_mats)
 
         if needs_tangent:
             entry.enable_tangent()

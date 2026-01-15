@@ -1,7 +1,7 @@
 # i3dio/export_core/shapes/resolve/merge_children.py
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 import bpy
 import mathutils
@@ -80,21 +80,15 @@ def _collect_contributors(
     root_world = root_obj.matrix_world.copy()
     out: list[tuple[bpy.types.Object, mathutils.Matrix, float]] = []
 
-    g_idx = 0
-    for top_child in sort_blender_objects_by_outliner_ordering(root_obj.children):
-        g = min(g_idx, _MAX_G) / _MAX_G
+    for idx, top_child in enumerate(sort_blender_objects_by_outliner_ordering(root_obj.children)):
+        g = min(idx * steps, _MAX_G) / _MAX_G
         ref_frame = root_world if apply_transforms else top_child.matrix_world.copy()
 
-        for mesh_obj in _iter_mesh_objects_recursive(top_child):
-            out.append((mesh_obj, ref_frame, g))
-
-        g_idx += steps
+        stack = [top_child]
+        while stack:
+            obj = stack.pop()
+            if obj.type == 'MESH':
+                out.append((obj, ref_frame, g))
+            stack.extend(obj.children)
 
     return out
-
-
-def _iter_mesh_objects_recursive(obj: bpy.types.Object) -> Iterable[bpy.types.Object]:
-    if obj.type == 'MESH':
-        yield obj
-    for ch in obj.children:
-        yield from _iter_mesh_objects_recursive(ch)

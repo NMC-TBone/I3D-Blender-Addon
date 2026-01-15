@@ -49,23 +49,23 @@ def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
 
 
 def emit_scene(ctx: ExportContext, scene_elem) -> None:
+    rep = ctx.reporter("emit_scene")
+
     def emit_node(node_id: int, parent_elem) -> None:
         node = ctx.ir.scene_nodes[node_id]
-
-        if not node.emit:
-            for child_id in ctx.ir.emitted_child_ids(node_id):
-                emit_node(child_id, parent_elem)
-            return
-
-        elem = SubElementA(parent_elem, node.kind.value, {"name": node.name, "nodeId": node.id})
-        write_node_attributes(elem=elem, node=node)
-        write_child_elements(parent_elem=elem, emit_attrs=node.attrs)
-        _write_transform(ctx, elem, node)
+        next_parent = parent_elem
+        if node.emit:
+            elem = SubElementA(parent_elem, node.kind.value, {"name": node.name, "nodeId": node.id})
+            write_node_attributes(elem=elem, node=node)
+            write_child_elements(parent_elem=elem, emit_attrs=node.attrs)
+            _write_transform(ctx, elem, node)
+            next_parent = elem
 
         for child_id in ctx.ir.emitted_child_ids(node_id):
-            emit_node(child_id, elem)
+            emit_node(child_id, next_parent)
 
-    ctx.reporter("emit_scene").info("Emitting scene with %d root nodes", len(ctx.ir.emitted_child_ids(None)))
-    for root_id in ctx.ir.emitted_child_ids(None):
+    roots = ctx.ir.emitted_child_ids(None)
+    rep.info("Emitting scene with %d root nodes", len(roots))
+    for root_id in roots:
         ctx.node_reporter(ctx.ir.scene_nodes[root_id]).debug("Emitting scene root node")
         emit_node(root_id, scene_elem)

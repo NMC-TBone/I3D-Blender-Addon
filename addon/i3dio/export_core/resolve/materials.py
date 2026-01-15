@@ -9,13 +9,20 @@ from bpy_extras.node_shader_utils import PrincipledBSDFWrapper, ShaderImageTextu
 from ... import utility
 from ...ui.shader_parser import get_shader_dict
 from ...ui.shader_picker import SHADER_DEFAULT
+from .properties import resolve_material_properties
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
     from ..model.materials import MaterialEntry
 
 
-def resolve_material_shading(ctx: ExportContext, entry: MaterialEntry) -> None:
+def resolve_material_entries(ctx: ExportContext) -> None:
+    for entry in ctx.materials.entries():
+        resolve_material_properties(ctx, entry)
+        _resolve_material_shading(ctx, entry)
+
+
+def _resolve_material_shading(ctx: ExportContext, entry: MaterialEntry) -> None:
     """Populate Material XML (textures/colors/custom shader) from Blender material data."""
     mat = entry.blender_material
     if mat is None or not isinstance(mat, bpy.types.Material):
@@ -27,11 +34,9 @@ def resolve_material_shading(ctx: ExportContext, entry: MaterialEntry) -> None:
     principled = PrincipledBSDFWrapper(mat, is_readonly=True)
     bsdf: bpy.types.ShaderNodeBsdfPrincipled = principled.node_principled_bsdf
 
-    def _socket(name: str) -> bpy.types.NodeSocket | None:
-        return bsdf.inputs.get(name) if bsdf else None
-
     def _set_color(xml_key: str, socket_name: str, fallback) -> None:
-        col = _linked_rgb_color(_socket(socket_name)) or fallback
+        sock = bsdf.inputs.get(socket_name) if bsdf else None
+        col = _linked_rgb_color(sock) or fallback
         entry.attrs.node.setdefault(xml_key, list(col)[:3])
 
     def _set_tex(tag: str, path: str) -> dict:
@@ -112,7 +117,11 @@ def _emit_custom_textures(ctx: "ExportContext", entry: "MaterialEntry", textures
 
 def _find_glossmap_path(mat: bpy.types.Material, principled: PrincipledBSDFWrapper) -> str | None:
     # Prefer explicit node called "glossmap" (legacy workflow)
-    if (glossnode := _find_node_by_name(mat, "glossmap")) is not None:
+    glossnode = None
+    if nt := mat.node_tree:
+        name_l = "glossmap"
+        glossnode = next((n for n in nt.nodes if n.name.lower() == name_l or n.label.lower() == name_l), None)
+    if glossnode is not None:
         match glossnode.bl_idname:
             case "ShaderNodeTexImage":
                 return _image_path(glossnode)
@@ -124,13 +133,6 @@ def _find_glossmap_path(mat: bpy.types.Material, principled: PrincipledBSDFWrapp
                         return _image_path(from_node)
 
     return _image_path(principled.specular_texture)
-
-
-def _find_node_by_name(mat: bpy.types.Material, name: str) -> bpy.types.Node | None:
-    if not (nt := mat.node_tree):
-        return None
-    name_l = name.lower()
-    return next((node for node in nt.nodes if node.name.lower() == name_l or node.label.lower() == name_l), None)
 
 
 def _linked_rgb_color(socket: bpy.types.NodeSocket | None) -> list[float] | None:
@@ -145,4 +147,4 @@ def _linked_rgb_color(socket: bpy.types.NodeSocket | None) -> list[float] | None
 def _image_path(tex: ShaderImageTextureWrapper | bpy.types.ShaderNodeTexImage | None) -> str | None:
     if not tex or not (img := tex.image):
         return None
-    return img.filepath_from_user() or (img.filepath if img.filepath else None)
+    return img.filepath_from_user() or img.filepath or None
