@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from xml.sax.saxutils import quoteattr
 
 from ... import xml_i3d
 
@@ -23,12 +24,11 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     indices = built.indices
 
     vcount = int(positions.shape[0])
-    tri_count = int(indices.shape[0] // 3)
+    tri_count = int(indices.size // 3)
 
     # Localize lookups (can be a bit faster)
     write_open = xml_i3d.write_open_tag
     write_close = xml_i3d.write_close_tag
-    escape_attr = xml_i3d.escape_attr
 
     write = f.write
 
@@ -131,9 +131,7 @@ def write_its_stream(f, built: BuiltITS, indent: str = "    ") -> None:
     # <Subsets ...>
     write_open(f, "Subsets", {"count": len(built.subsets)}, indent=ind_child)
     for s in built.subsets:
-        slot_attr = (
-            f' materialSlotName="{escape_attr(s.material_slot_name)}"' if s.material_slot_name is not None else ""
-        )
+        slot_attr = f" materialSlotName={quoteattr(s.material_slot_name)}" if s.material_slot_name else ""
         write(
             f'{ind_line}<Subset firstIndex="{s.first_index:d}" '
             f'numVertices="{s.num_vertices:d}" firstVertex="{s.first_vertex:d}" '

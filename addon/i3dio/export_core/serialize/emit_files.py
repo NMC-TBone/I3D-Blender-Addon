@@ -12,11 +12,10 @@ if TYPE_CHECKING:
 def emit_files(ctx: "ExportContext", files_elem) -> None:
     """
     Write <Files> entries from ctx.files.
-
     Expects ctx.files.finalize() to have run so each entry has resolved_path.
     """
     for e in ctx.files.entries():
         if e.resolved_path is None:
             continue
         # filename is the resolved (export) path
-        xml_i3d.SubElement(files_elem, "File", {"fileId": str(e.id), "filename": e.resolved_path.as_posix()})
+        xml_i3d.SubElementA(files_elem, "File", {"fileId": e.id, "filename": e.resolved_path.as_posix()})

@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 import mathutils
 
-from ... import xml_i3d
 from ...utility import isclose_any
-from ..ir import SceneNode
+from ...xml_i3d import SubElementA, write_attribute
 from .xml_attrs import write_child_elements, write_node_attributes
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
+    from ..ir import SceneNode
 
 _ZERO3 = mathutils.Vector((0.0, 0.0, 0.0))
 _ONE3 = mathutils.Vector((1.0, 1.0, 1.0))
@@ -28,13 +28,13 @@ def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
     t = matrix_local_export.to_translation()
     if not isclose_any(t, _ZERO3):
         t_scaled = (t.x * ctx.unit_scale, t.y * ctx.unit_scale, t.z * ctx.unit_scale)
-        xml_i3d.write_attribute(elem, "translation", t_scaled)
+        write_attribute(elem, "translation", t_scaled)
 
     # Rotation (degrees)
     r = matrix_local_export.to_euler("XYZ")
     if not isclose_any(r, _ZERO_EULER_XYZ):
         r_deg = (math.degrees(r.x), math.degrees(r.y), math.degrees(r.z))
-        xml_i3d.write_attribute(elem, "rotation", r_deg)
+        write_attribute(elem, "rotation", r_deg)
 
     # Scale
     if matrix_local_export.is_negative:
@@ -45,7 +45,7 @@ def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
 
     s = matrix_local_export.to_scale()
     if not isclose_any(s, _ONE3):
-        xml_i3d.write_attribute(elem, "scale", (s.x, s.y, s.z))
+        write_attribute(elem, "scale", (s.x, s.y, s.z))
 
 
 def emit_scene(ctx: ExportContext, scene_elem) -> None:
@@ -57,7 +57,7 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
                 emit_node(child_id, parent_elem)
             return
 
-        elem = xml_i3d.SubElement(parent_elem, node.kind.value, {"name": node.name, "nodeId": str(node.id)})
+        elem = SubElementA(parent_elem, node.kind.value, {"name": node.name, "nodeId": node.id})
         write_node_attributes(elem=elem, node=node)
         write_child_elements(parent_elem=elem, emit_attrs=node.attrs)
         _write_transform(ctx, elem, node)

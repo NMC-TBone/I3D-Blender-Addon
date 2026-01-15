@@ -14,37 +14,26 @@ if TYPE_CHECKING:
 
 
 def write_i3d(ctx: ExportContext) -> None:
-    ctx.reporter().info(f"Writing I3D file to '{ctx.filepath}'")
+    ctx.reporter().info(f"Writing I3D file to {ctx.filepath!r}")
     root = xml_i3d.i3d_root_element(ctx.name)
 
-    xml_i3d.SubElement(root, "Asset")
-    files_elem = xml_i3d.SubElement(root, "Files")
-    emit_files(ctx, files_elem)
-    mat_elem = xml_i3d.SubElement(root, "Materials")
-    emit_materials(ctx, mat_elem)
-    xml_i3d.SubElement(root, "Shapes")
+    xml_i3d.SubElementA(root, "Asset")
+    emit_files(ctx, xml_i3d.SubElementA(root, "Files"))
+    emit_materials(ctx, xml_i3d.SubElementA(root, "Materials"))
+    xml_i3d.SubElementA(root, "Shapes")
 
-    xml_i3d.SubElement(root, "Dynamics")
+    xml_i3d.SubElementA(root, "Dynamics")
 
-    scene_elem = xml_i3d.SubElement(root, "Scene")
-    emit_scene(ctx, scene_elem)
+    emit_scene(ctx, xml_i3d.SubElementA(root, "Scene"))
     ctx.reporter().info("Finished writing scene")
 
-    xml_i3d.SubElement(root, "Animation")
-    xml_i3d.SubElement(root, "UserAttributes")
+    xml_i3d.SubElementA(root, "Animation")
+    xml_i3d.SubElementA(root, "UserAttributes")
 
     def _shapes_writer(f):
         for built in ctx.shapes.iter_built():
             write_its_stream(f, built, indent="    ")
 
     ctx.reporter().info("Finalizing I3D file write")
-    xml_i3d.export_to_i3d_file(
-        root=root,
-        file_path=ctx.filepath,
-        shapes_writer=_shapes_writer,
-        encoding="iso-8859-1",
-        xml_declaration=True,
-        pretty=ctx.is_dev,
-        skip_indent_tags={"Shapes"},
-    )
+    xml_i3d.export_to_i3d_file(root=root, file_path=ctx.filepath, shapes_writer=_shapes_writer)
     ctx.reporter().info("I3D file write complete")

@@ -14,7 +14,8 @@ from __future__ import annotations
 import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Mapping, TextIO
+from xml.sax.saxutils import quoteattr
 
 import bpy
 import mathutils
@@ -27,6 +28,9 @@ logger = logging.getLogger(__name__)
 XML_Element = ET.Element
 FILE_EXT = ".i3d"
 I3D_MAX = 3.40282e38
+
+_ENCODING = "iso-8859-1"
+_INDENT = "  "
 
 
 # Parse / Element constructors
@@ -42,12 +46,15 @@ def SubElement(*args, **kwargs) -> ET.Element:  # noqa: N802
     return ET.SubElement(*args, **kwargs)
 
 
-def Element(*args, **kwargs) -> ET.Element:  # noqa: N802
-    return ET.Element(*args, **kwargs)
-
-
-def ElementTree(*args, **kwargs) -> ET.ElementTree:  # noqa: N802
-    return ET.ElementTree(*args, **kwargs)
+def SubElementA(parent: ET.Element, tag: str, attrib: Mapping[str, Any] | None = None, **extra: Any) -> ET.Element:  # noqa: N802
+    """Like ET.SubElement, but all attribute values go through fmt_attr_value()."""
+    elem = ET.SubElement(parent, tag)
+    if attrib:
+        for k, v in attrib.items():
+            write_attribute(elem, k, v)
+    for k, v in extra.items():
+        write_attribute(elem, k, v)
+    return elem
 
 
 # Root
@@ -57,7 +64,7 @@ def i3d_root_element(name: str) -> XML_Element:
         "xsi:noNamespaceSchemaLocation": "http://i3d.giants.ch/schema/i3d-1.6.xsd",
         "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
     }
-    return Element("i3D", attrib={"name": name, **root_attributes, **namespaced_attributes})
+    return ET.Element("i3D", attrib={"name": name, **root_attributes, **namespaced_attributes})
 
 
 # Attribute formatting / writing
@@ -69,12 +76,12 @@ def fmt_attr_value(value: Any) -> str:
     """
     Format a value as it should appear inside an XML attribute.
 
-    This function is the single formatting source of truth for:
+    This is the single formatting source of truth for:
     - ElementTree attribute writes (write_attribute)
-    - Streaming writers (export_to_i3d_file_streaming_shapes, write_its_stream, etc.)
+    - Streaming writers (write_open_tag, ITS stream, etc.)
     """
-    if isinstance(value, bool):  # order matters (bool is int subclass)
-        return str(value).lower()
+    if isinstance(value, (bool, np.bool_)):  # order matters (bool is int subclass)
+        return "true" if bool(value) else "false"
     if isinstance(value, int):
         return f"{value:d}"
     if isinstance(value, float):
@@ -102,146 +109,78 @@ def fmt_attr_value(value: Any) -> str:
     return str(value)
 
 
-def escape_attr(text: str) -> str:
-    """Escape attribute value using the i3d-compatible escape function."""
-    return ET._escape_attrib(text)
-
-
 def write_attribute(element: XML_Element, attribute: str, value: Any) -> None:
     element.set(attribute, fmt_attr_value(value))
 
 
 # Pretty indentation
-def add_indentations(element: XML_Element, level: int = 0, *, skip_tags: set[str] | None = None) -> None:
-    """
-    Pretty-print indentation similar to the classic effbot recipe, but with the ability
-    to skip entire subtrees (e.g. skip_tags={"Shapes"}).
-    """
-    skip = skip_tags or set()
-    if element.tag in skip:
-        return
+def add_indentations(elem: ET.Element, level: int = 0) -> None:
+    """Pretty-print XML by adding indentation text nodes."""
+    i = "\n" + level * _INDENT
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = i + _INDENT
 
-    indent = "\n" + level * "  "
-    if len(element):
-        if not element.text or not element.text.strip():
-            element.text = indent + "  "
-        if not element.tail or not element.tail.strip():
-            element.tail = indent
+        for child in elem:
+            add_indentations(child, level + 1)
+            if not child.tail or not child.tail.strip():
+                child.tail = i + _INDENT  # indent siblings under this parent
 
-        for child in element:
-            add_indentations(child, level + 1, skip_tags=skip)
-
-        if not element.tail or not element.tail.strip():
-            element.tail = indent
+        # IMPORTANT: last child tail should align the closing tag of the parent
+        if not elem[-1].tail or not elem[-1].tail.strip():
+            elem[-1].tail = i
     else:
-        if level and (not element.tail or not element.tail.strip()):
-            element.tail = indent
+        if level and (not elem.tail or not elem.tail.strip()):
+            elem.tail = i
 
 
-def write_tree_to_file(
-    tree: ET.ElementTree,
-    file_path: str | Path,
-    *argv,
-    pretty: bool = True,
-    skip_indent_tags: set[str] | None = None,
-    **kwargs,
-) -> None:
-    if pretty:
-        add_indentations(tree.getroot(), skip_tags=skip_indent_tags)
-    tree.write(file_path, *argv, **kwargs)
-
-
-def write_open_tag(f, tag: str, attrib: dict[str, Any], indent: str = "") -> None:
-    if attrib:
-        parts = [f'{k}="{escape_attr(fmt_attr_value(v))}"' for k, v in attrib.items()]
-        f.write(f"{indent}<{tag} " + " ".join(parts) + ">\n")
-    else:
+# Streaming writer helpers
+def write_open_tag(f: TextIO, tag: str, attrib: Mapping[str, Any] | None = None, indent: str = "") -> None:
+    if not attrib:
         f.write(f"{indent}<{tag}>\n")
+        return
+    parts = [f"{k}={quoteattr(fmt_attr_value(v))}" for k, v in attrib.items()]
+    f.write(f"{indent}<{tag} " + " ".join(parts) + ">\n")
 
 
-def write_close_tag(f, tag: str, indent: str = "") -> None:
+def write_close_tag(f: TextIO, tag: str, indent: str = "") -> None:
     f.write(f"{indent}</{tag}>\n")
 
 
-def export_to_i3d_file(
-    *,
-    root: ET.Element,
-    file_path: str | Path,
-    shapes_writer=None,  # optional callable(f)
-    encoding: str = "iso-8859-1",
-    xml_declaration: bool = True,
-    pretty: bool = True,
-    skip_indent_tags: set[str] | None = None,
-) -> None:
+# Export
+def export_to_i3d_file(*, root: ET.Element, file_path: str | Path, shapes_writer: Callable[[TextIO], None]) -> None:
     """
-    Write an i3d where all sections are ElementTree-serialized, except <Shapes> content,
-    which is produced by `shapes_writer(f)`.
+    Write an I3D where all sections are ElementTree-serialized, except <Shapes> content,
+    which is produced by shapes_writer(f).
 
-    If `pretty` is True, indentation is applied to the ElementTree beforehand, but you can
-    skip indenting certain tags (typically {"Shapes"}) using skip_indent_tags.
+    NOTE: Shapes are always streamed for performance.
     """
-    if shapes_writer is None:
-        settings = {"xml_declaration": xml_declaration, "encoding": encoding, "method": "xml"}
-        write_tree_to_file(ElementTree(root), file_path, pretty=pretty, skip_indent_tags=skip_indent_tags, **settings)
-        return
-    if pretty:
-        add_indentations(root, skip_tags=skip_indent_tags)
+    if not any(child.tag == "Shapes" for child in list(root)):
+        raise ValueError("Root element has no <Shapes> child. Add it before exporting.")
+    # Always pretty-print the non-streamed parts. Not really any noticeable performance cost.
+    add_indentations(root)
 
-    with open(file_path, "w", encoding=encoding, newline="\n") as f:
-        if xml_declaration:
-            f.write(f'<?xml version="1.0" encoding="{encoding}"?>\n')
+    with open(file_path, "w", encoding=_ENCODING, newline="\n") as f:
+        f.write(f'<?xml version="1.0" encoding="{_ENCODING}"?>\n')
 
         # <i3D ...>
         write_open_tag(f, root.tag, root.attrib, indent="")
+        t = root.text or ""
+        if t.startswith("\n"):
+            t = t[1:]
+        f.write(t)
 
         # Children in order; stream Shapes
         for child in list(root):
             if child.tag == "Shapes":
-                f.write("  <Shapes>\n")
+                f.write("<Shapes>\n")  # Already at correct indent level due to root.text / previous tail
                 shapes_writer(f)
-                f.write("  </Shapes>\n")
+                # Close Shapes at one indent level (2 spaces)
+                f.write("  </Shapes>")
+                # Preserve whatever indentation/newline ElementTree computed after <Shapes/>
+                f.write(child.tail or "\n")
                 continue
 
-            xml = ET.tostring(child, encoding="unicode", method="xml")
-            # Prefix with two spaces so direct children align under root
-            for line in xml.splitlines(True):
-                f.write(("  " + line) if line.strip() else line)
+            f.write(ET.tostring(child, encoding="unicode", method="xml"))
 
         write_close_tag(f, root.tag, indent="")
-
-
-# Attribute escaping monkeypatch (i3d-specific)
-def _escape_attrib_i3d(text):
-    """
-    Escape attribute values. Same behavior as your previous implementation, kept here
-    to ensure > is not escaped (required for i3d format).
-    """
-    try:
-        if "&" in text:
-            text = text.replace("&", "&amp;")
-        if "<" in text:
-            text = text.replace("<", "&lt;")
-        if ">" in text:
-            # Needed for the i3d format: do not escape >
-            pass
-        if '"' in text:
-            text = text.replace('"', "&quot;")
-
-        # Normalize newlines per XML rules
-        if "\r\n" in text:
-            text = text.replace("\r\n", "\n")
-        if "\r" in text:
-            text = text.replace("\r", "\n")
-
-        # Escape control whitespace
-        if "\n" in text:
-            text = text.replace("\n", "&#10;")
-        if "\t" in text:
-            text = text.replace("\t", "&#09;")
-        return text
-    except (TypeError, AttributeError):
-        ET._raise_serialization_error(text)
-
-
-# Assign the escape attribute function to replace the default implementation
-ET._escape_attrib = _escape_attrib_i3d
