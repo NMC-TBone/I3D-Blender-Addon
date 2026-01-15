@@ -17,7 +17,7 @@ def write_i3d(ctx: ExportContext) -> None:
     ctx.reporter().info(f"Writing I3D file to {ctx.filepath!r}")
     root = xml_i3d.i3d_root_element(ctx.name)
 
-    xml_i3d.SubElementA(root, "Asset")
+    xml_i3d.SubElementA(root, "Asset")  # i3dConverter.exe will overwrite this anyways....
     emit_files(ctx, xml_i3d.SubElementA(root, "Files"))
     emit_materials(ctx, xml_i3d.SubElementA(root, "Materials"))
     xml_i3d.SubElementA(root, "Shapes")
