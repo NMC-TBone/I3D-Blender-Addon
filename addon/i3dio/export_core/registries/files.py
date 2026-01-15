@@ -39,27 +39,26 @@ class FileEntry:
 @dataclass(slots=True)
 class FileTable(IdEntryTable[FileEntry, tuple[FileKind, str]]):
     """
-    Modern replacement for the old Node-based File/Image/Shader/Reference system.
-
-    Responsibilities (mirrors legacy behavior):
+    Responsibilities:
       - de-duplicate file registrations and provide stable file IDs
       - finalize() resolves each file path for export and optionally copies it
     """
 
-    ctx: "ExportContext"
+    ctx: ExportContext
     _by_key: dict[tuple[FileKind, str], int] = field(default_factory=dict)
     _entries: dict[int, FileEntry] = field(default_factory=dict)
 
-    def _alloc_entry(self, *, key: tuple[FileKind, str], kind: FileKind, blender_path: str) -> int:
+    def _alloc_entry(self, *, key: tuple[FileKind, str], kind: FileKind, blender_path: str) -> FileEntry:
         fid = self.ctx.ids.alloc(IdKind.FILE)
-        self.register(key=key, entry_id=fid, entry=FileEntry(id=fid, kind=kind, blender_path=blender_path))
-        return fid
+        entry = FileEntry(id=fid, kind=kind, blender_path=blender_path)
+        self.register(key=key, entry_id=fid, entry=entry)
+        return entry
 
     def add(self, *, kind: FileKind, blender_path: str) -> int:
         key = (kind, blender_path)
         if (fid := self.get_id(key)) is not None:
             return fid
-        return self._alloc_entry(key=key, kind=kind, blender_path=blender_path)
+        return self._alloc_entry(key=key, kind=kind, blender_path=blender_path).id
 
     def add_reference(self, blender_path: str) -> int:
         return self.add(kind="reference", blender_path=blender_path)

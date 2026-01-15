@@ -124,63 +124,100 @@ class IRIndex:
 class ExportIR:
     """Intermediate representation of the export scene graph.
 
-    This is the central data structure for export, built during traversal and
-    consumed by resolve/serialize phases.
+    Built during traversal, consumed by resolve and serialization.
 
-    Core concepts:
-    - Nodes stored by ID in `scene_nodes` dict
-    - Hierarchy via `parent_id` (single source of truth)
-    - Caches built on-demand for efficient queries
-    - `node_order` preserves creation order for deterministic output
-
-    Usage:
-    - Builder: Creates nodes via `add_node()`
-    - Resolve: Queries via `iter_nodes()`, `iter_roots()`, etc.
-    - Serialize: Traverses via `emitted_child_ids()` which flattens emit=False nodes
+    Notes:
+    - parent_id is the single source of truth for hierarchy.
+    - Hierarchy caches are built lazily and invalidated on mutations.
+    - node_order preserves deterministic traversal/output ordering.
     """
 
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     node_order: list[int] = field(default_factory=list)  # node ids in creation order (stable)
     index: IRIndex = field(default_factory=IRIndex)
 
-    # Caches for fast hierarchy queries (built on-demand)
-    _children_cache: dict[int | None, list[int]] = field(default_factory=dict, init=False)  # parent_id -> [child_ids]
-    _roots_cache: list[int] = field(default_factory=list, init=False)  # cached root node ids
+    # Caches for fast hierarchy queries (built-on-demand)
+    _children_cache: dict[int | None, list[int]] | None = None  # parent_id -> [child_ids]
+    _roots_cache: list[int] | None = None  # cached root node ids (parent_id=None)
 
+    # Cache management
+    def _invalidate_caches(self) -> None:
+        self._roots_cache = None
+        self._children_cache = None
+
+    def _ensure_hierarchy(self) -> None:
+        """Build hierarchy caches from current parent_id relationships."""
+        if self._roots_cache is not None and self._children_cache is not None:
+            return
+
+        children: dict[int | None, list[int]] = {None: []}
+        roots: list[int] = []
+
+        # Make deterministic: build using node_order (not dict iteration)
+        for nid in self.node_order:
+            children[nid] = []
+
+        for nid in self.node_order:
+            node = self.scene_nodes[nid]
+            pid = node.parent_id
+
+            # Safeguard policy:
+            # - pid is None -> root
+            # - pid missing -> treat as root (best-effort)
+            # - pid == nid -> treat as root (self-parent)
+            if pid is None or pid == nid or pid not in self.scene_nodes:
+                roots.append(nid)
+                children[None].append(nid)
+            else:
+                children[pid].append(nid)
+
+        self._roots_cache = roots
+        self._children_cache = children
+
+    # Mutations
     def _index_node_blender_ref(self, node: SceneNode) -> None:
         """Index node by its Blender reference pointer (if any)."""
         if (ptr := node.source_ptr) is not None:
             self.index.node_id_by_blender_ptr.setdefault(ptr, []).append(node.id)
 
-    def _invalidate_caches(self) -> None:
-        self._roots_cache.clear()
-        self._children_cache.clear()
-
     def add_node(self, node: SceneNode, *, parent_id: int | None = None) -> None:
-        """Add a pre-created SceneNode into the IR and attach it."""
+        """Add a pre-created SceneNode into the IR."""
+        if node.id in self.scene_nodes:
+            raise RuntimeError(f"Node ID {node.id} already exists in IR")
+        if parent_id is not None:
+            node.parent_id = parent_id
         self.scene_nodes[node.id] = node
         self.node_order.append(node.id)
         self._index_node_blender_ref(node)
-        if parent_id is not None:
-            node.parent_id = parent_id
         self._invalidate_caches()
 
-    def _ensure_hierarchy(self) -> None:
-        """Build hierarchy caches from parent_id relationships (internal use only)."""
-        if self._children_cache and self._roots_cache:
+    def attach(self, node_id: int, parent_id: int | None) -> None:
+        """Change a node's parent (reparent operation). No-op if the parent is unchanged or would create a cycle."""
+        if node_id not in self.scene_nodes:
+            raise KeyError(f"Node ID {node_id} not found in IR")
+
+        if parent_id == node_id:
             return
-        self._invalidate_caches()
-        for node in self.scene_nodes.values():
-            self._children_cache.setdefault(node.id, [])
-            pid = node.parent_id
-            if pid is None:
-                self._roots_cache.append(node.id)
-                self._children_cache.setdefault(None, []).append(node.id)
-            elif pid in self.scene_nodes:
-                self._children_cache.setdefault(pid, []).append(node.id)
 
+        # Cycle check (walk up ancestors starting at proposed parent)
+        pid = parent_id
+        while pid is not None:
+            if pid == node_id:
+                return  # cycle detected
+            p = self.scene_nodes.get(pid)
+            if p is None:
+                break  # missing parent in chain (best-effort)
+            pid = p.parent_id
+
+        n = self.scene_nodes[node_id]
+        if n.parent_id == parent_id:
+            return
+        n.parent_id = parent_id
+        self._invalidate_caches()
+
+    # Queries
     def iter_roots(self) -> Iterator[SceneNode]:
-        """Iterate over root nodes (those with parent_id=None)."""
+        """Iterate over root nodes (parent_id=None)."""
         self._ensure_hierarchy()
         return (self.scene_nodes[rid] for rid in self._roots_cache)
 
@@ -192,6 +229,7 @@ class ExportIR:
         source_object_type: str | None = None,
         emitted_only: bool = False,
     ) -> Iterator[SceneNode]:
+        """Iterate nodes in deterministic creation order."""
         for node_id in self.node_order:
             n = self.scene_nodes[node_id]
             if kind is not None and n.kind is not kind:
@@ -204,13 +242,17 @@ class ExportIR:
                 continue
             yield n
 
-    def children_ids(self, parent_id: int) -> list[int]:
-        """Get direct child node IDs for a given parent (no emit filtering)."""
+    def children_ids(self, parent_id: int) -> tuple[int, ...]:
+        """Get direct child node IDs (no emit filtering)."""
         self._ensure_hierarchy()
-        return self._children_cache.get(parent_id, [])
+        return tuple(self._children_cache.get(parent_id, ()))
 
     def emitted_child_ids(self, node_id: int | None) -> list[int]:
-        """Get child IDs to emit, flattening emit=False nodes recursively."""
+        """Get child IDs to emit, flattening emit=False nodes recursively.
+
+        - node_id=None returns emitted root ids (flattening non-emitted roots).
+        - preserves deterministic sibling order.
+        """
         self._ensure_hierarchy()
         result: list[int] = []
         for cid in self._children_cache.get(node_id, []):
@@ -219,23 +261,3 @@ class ExportIR:
             else:
                 result.extend(self.emitted_child_ids(cid))
         return result
-
-    def attach(self, node_id: int, parent_id: int | None) -> None:
-        """Change a node's parent (reparent operation). No-op if the parent is unchanged or would create a cycle."""
-        if parent_id == node_id:
-            return
-
-        pid = parent_id
-        while pid is not None:
-            if pid == node_id:
-                return  # cycle detected
-            p = self.scene_nodes.get(pid)
-            if p is None:
-                break
-            pid = p.parent_id
-
-        n = self.scene_nodes[node_id]
-        if n.parent_id == parent_id:
-            return
-        n.parent_id = parent_id
-        self._invalidate_caches()

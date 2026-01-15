@@ -66,39 +66,32 @@ def add_object(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | None)
     _add_object_with_children(ctx, obj, parent_id, child_iter=_default_child_iter, expand_instance_collections=True)
 
 
-def build_from_collection(ctx: ExportContext, collection: bpy.types.Collection, parent_id: int | None) -> None:
-    """
-    Export a collection:
-      - child collections first (outliner-like)
-      - then *root* objects in the collection (obj.parent is None)
-
-    Parenting wins placement: non-root objects are exported via their object-parent chain, not
-    because they "live" in a collection.
-    """
-    for child_coll in collection.children.values():
-        add_collection(ctx, child_coll, parent_id)
-
-    roots = [obj for obj in collection.objects if obj.parent is None]
-    for obj in sort_blender_objects_by_outliner_ordering(roots):
-        add_object(ctx, obj, parent_id)
-
-
 def add_collection(
     ctx: ExportContext, collection: bpy.types.Collection, parent_id: int | None, *, emit_self: bool = True
 ) -> None:
     """
     Add a collection and its contents.
-
-    If keep_collections_as_transformgroups: create a TransformGroup node for the collection itself.
-    Otherwise: the collection is "transparent" and its children attach to the given parent_id.
-
-    emit_self controls whether to create a node for the collection itself (e.g. we don't want Scene Collection with ALL)
+    - Child collections first, then root objects (outliner-like).
+    - Collection membership doesn't drive parenting: only root objects are added here;
+      non-root objects are exported via their object-parent chain elsewhere.
+    - If keep_collections_as_transformgroups and emit_self: emit a TG node for the collection,
+      otherwise treat it as transparent.
     """
-    if not emit_self or not ctx.setting("keep_collections_as_transformgroups", False):
-        build_from_collection(ctx, collection, parent_id)
-        return
-    node_id = ctx.builder.add_collection(collection, parent_id=parent_id)
-    build_from_collection(ctx, collection, node_id)
+    keep = ctx.setting("keep_collections_as_transformgroups", False)
+
+    # Decide where the collection's contents should attach
+    contents_parent_id = parent_id
+    if emit_self and keep:
+        contents_parent_id = ctx.builder.add_collection(collection, parent_id=parent_id)
+
+    # Child collections first
+    for child_coll in collection.children.values():
+        add_collection(ctx, child_coll, contents_parent_id)
+
+    # Then root objects in this collection (non-root objects come via parent chain elsewhere)
+    roots = [obj for obj in collection.objects if obj.parent is None]
+    for obj in sort_blender_objects_by_outliner_ordering(roots):
+        add_object(ctx, obj, contents_parent_id)
 
 
 def build_from_objects(ctx: ExportContext, objects: Iterable[bpy.types.Object]) -> None:

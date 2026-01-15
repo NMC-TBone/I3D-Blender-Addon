@@ -23,10 +23,11 @@ class MaterialTable(IdEntryTable[MaterialEntry, MaterialKey]):
     _entries: dict[int, MaterialEntry] = field(default_factory=dict)
     _default_id: int | None = None
 
-    def _alloc_entry(self, *, key: MaterialKey, blender_material: bpy.types.Material | None) -> int:
+    def _alloc_entry(self, *, key: MaterialKey, blender_material: bpy.types.Material | None) -> MaterialEntry:
         mid = self.ctx.ids.alloc(IdKind.MATERIAL)
-        self.register(key=key, entry_id=mid, entry=MaterialEntry(id=mid, key=key, blender_material=blender_material))
-        return mid
+        entry = MaterialEntry(id=mid, key=key, blender_material=blender_material)
+        self.register(key=key, entry_id=mid, entry=entry)
+        return entry
 
     def get_default_id(self) -> int:
         if self._default_id is None:
@@ -46,14 +47,14 @@ class MaterialTable(IdEntryTable[MaterialEntry, MaterialKey]):
                 if name == DEFAULT_MATERIAL_NAME:
                     self._default_id = mid
                 return mid
-            mid = self._alloc_entry(key=key, blender_material=None)
+            entry = self._alloc_entry(key=key, blender_material=None)
             if name == DEFAULT_MATERIAL_NAME:
-                self._default_id = mid
-            return mid
+                self._default_id = entry.id
+            return entry.id
 
         name = export_name or mat.name
         key = MaterialKey(mat.as_pointer(), name)
         if (mid := self.get_id(key)) is not None:
             return mid
 
-        return self._alloc_entry(key=key, blender_material=mat)
+        return self._alloc_entry(key=key, blender_material=mat).id

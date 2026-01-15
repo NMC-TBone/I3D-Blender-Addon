@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
-    ctx: "ExportContext"
+    ctx: ExportContext
     _by_key: dict[ShapeKey, int] = field(default_factory=dict)
     _entries: dict[int, ShapeEntry] = field(default_factory=dict)
     built_by_id: dict[int, BuiltITS | None] = field(default_factory=dict)
