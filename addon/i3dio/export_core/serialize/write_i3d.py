@@ -7,6 +7,7 @@ from ... import xml_i3d
 from .emit_files import emit_files
 from .emit_materials import emit_materials
 from .emit_scene import emit_scene
+from .emit_user_attributes import emit_user_attributes
 from .indexed_triangle_set_stream import write_its_stream
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ def write_i3d(ctx: ExportContext) -> None:
     rep.info("Finished writing scene")
 
     xml_i3d.SubElementA(root, "Animation")
-    xml_i3d.SubElementA(root, "UserAttributes")
+    emit_user_attributes(ctx, xml_i3d.SubElementA(root, "UserAttributes"))
 
     def _shapes_writer(f):
         for built in ctx.shapes.iter_built():

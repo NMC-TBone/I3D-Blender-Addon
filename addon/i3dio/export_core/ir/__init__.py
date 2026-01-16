@@ -9,6 +9,7 @@ from .model import (
     SceneNode,
     ShapeSceneExt,
     SourceKind,
+    UserAttributeEntry,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "set_kind",
     "to_transform_group",
     "SourceKind",
+    "UserAttributeEntry",
 ]

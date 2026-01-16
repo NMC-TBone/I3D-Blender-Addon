@@ -58,6 +58,13 @@ class ReferenceNodeExt:
 
 
 @dataclass(slots=True)
+class UserAttributeEntry:
+    name: str
+    type: str
+    value: Any
+
+
+@dataclass(slots=True)
 class SceneNode:
     """A node in the export scene graph IR."""
 
@@ -118,6 +125,7 @@ class IRIndex:
     # Armature object ptr -> {bone_name: bone_node_id} (built in resolve_armatures)
     bone_nodes_by_armature_ptr: dict[int, dict[str, int]] = field(default_factory=dict)
     mapping_id_by_node_id: dict[int, str] = field(default_factory=dict)  # node_id -> i3dMapping id
+    user_attributes_by_node_id: dict[int, list[UserAttributeEntry]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

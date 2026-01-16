@@ -26,6 +26,7 @@ from .shapes import (
     resolve_shapes_build,
     resolve_skinned_meshes,
 )
+from .user_attributes import resolve_user_attributes
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -128,6 +129,7 @@ _PHASES: tuple[ResolvePhase, ...] = (
         (
             ResolvePass("matrices", resolve_matrices),
             ResolvePass("mappings", collect_i3d_mappings),
+            ResolvePass("user_attributes", resolve_user_attributes),
             ResolvePass("files", resolve_files),
         ),
     ),

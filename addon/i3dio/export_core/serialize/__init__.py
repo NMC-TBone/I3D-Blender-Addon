@@ -2,7 +2,7 @@ _needs_reload = "bpy" in locals()
 
 import bpy
 
-from . import emit_files, emit_materials, emit_scene, indexed_triangle_set_stream
+from . import emit_files, emit_materials, emit_scene, emit_user_attributes, indexed_triangle_set_stream
 
 if _needs_reload:
     import importlib
@@ -10,5 +10,6 @@ if _needs_reload:
     emit_files = importlib.reload(emit_files)
     emit_materials = importlib.reload(emit_materials)
     emit_scene = importlib.reload(emit_scene)
+    emit_user_attributes = importlib.reload(emit_user_attributes)
     indexed_triangle_set_stream = importlib.reload(indexed_triangle_set_stream)
     print("i3dio export_core.serialize reloaded")
