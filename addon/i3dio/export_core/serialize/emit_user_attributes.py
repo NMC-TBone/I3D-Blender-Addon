@@ -26,11 +26,7 @@ def emit_user_attributes(ctx: ExportContext, user_attrs_elem) -> None:
         total_nodes += 1
         ua_elem = xml_i3d.SubElementA(user_attrs_elem, "UserAttribute", {"nodeId": node_id})
         for entry in entries:
-            xml_i3d.SubElementA(
-                ua_elem,
-                "Attribute",
-                {"name": entry.name, "type": entry.type, "value": entry.value},
-            )
+            xml_i3d.SubElementA(ua_elem, "Attribute", {"name": entry.name, "type": entry.type, "value": entry.value})
             total_entries += 1
 
     rep.debug("Emitted user attributes: nodes=%d attrs=%d", total_nodes, total_entries)
