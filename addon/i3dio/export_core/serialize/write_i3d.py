@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ... import xml_i3d
+from .emit_animation import emit_animation
 from .emit_files import emit_files
 from .emit_materials import emit_materials
 from .emit_scene import emit_scene
@@ -29,7 +30,7 @@ def write_i3d(ctx: ExportContext) -> None:
     emit_scene(ctx, xml_i3d.SubElementA(root, "Scene"))
     rep.info("Finished writing scene")
 
-    xml_i3d.SubElementA(root, "Animation")
+    emit_animation(ctx, xml_i3d.SubElementA(root, "Animation"))
     emit_user_attributes(ctx, xml_i3d.SubElementA(root, "UserAttributes"))
 
     def _shapes_writer(f):

@@ -1,6 +1,7 @@
 # i3dio/export_core/blender/evaluated_mesh.py
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 import bpy
@@ -10,8 +11,31 @@ if TYPE_CHECKING:
     from ..ctx import ExportContext
 
 
+@contextmanager
+def temporary_disable_armature_modifiers(ctx: ExportContext, objs: set[bpy.types.Object]):
+    """Context manager to temporarily disable armature modifiers on the given objects."""
+    changed: list[tuple[bpy.types.Modifier, bool]] = []
+    try:
+        for obj in objs:
+            for mod in obj.modifiers:
+                if mod.type == "ARMATURE":
+                    changed.append((mod, mod.show_viewport))
+                    mod.show_viewport = False
+
+        # Force re-evaluation so evaluated_get/to_mesh sees the new modifier states
+        ctx.depsgraph.update()
+        yield
+    finally:
+        for mod, old in changed:
+            try:
+                mod.show_viewport = old
+            except Exception:
+                pass
+        ctx.depsgraph.update()
+
+
 def evaluated_mesh_for_export(
-    ctx: "ExportContext", obj: bpy.types.Object, *, reference_frame: Matrix | None = None
+    ctx: ExportContext, obj: bpy.types.Object, *, reference_frame: Matrix | None = None
 ) -> tuple[bpy.types.Object, bpy.types.Mesh]:
     """
     Create a temporary mesh for export:

@@ -66,7 +66,7 @@ class ExportContext:
         is_dev: bool,
         operator: Any,
         filepath: str | Path,
-        depsgraph,
+        depsgraph: bpy.types.Depsgraph,
         scene: bpy.types.Scene,
         conversion_matrix: mathutils.Matrix,
         settings: dict,

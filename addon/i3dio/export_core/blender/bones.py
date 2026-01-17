@@ -2,9 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 import bpy
 import mathutils
+
+
+class BoneMode(Enum):
+    REST = "REST"
+    POSE = "POSE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,33 +25,34 @@ class BoneRef:
         return self.bone_name
 
     def pose_bone(self) -> bpy.types.PoseBone | None:
-        try:
-            return self.armature_obj.pose.bones.get(self.bone_name)
-        except Exception:
-            return None
+        return self.armature_obj.pose.bones.get(self.bone_name) if self.armature_obj.pose is not None else None
 
     def data_bone(self) -> bpy.types.Bone | None:
-        try:
-            return self.armature_obj.data.bones.get(self.bone_name)
-        except Exception:
+        return self.armature_obj.data.bones.get(self.bone_name)
+
+    def matrix_armature_space(self, mode: BoneMode) -> mathutils.Matrix | None:
+        """Bone matrix in *armature object space* (Blender space, no export conversion)."""
+        if mode is BoneMode.POSE:
+            pb = self.pose_bone()
+            return pb.matrix.copy() if pb is not None else None
+
+        b = self.data_bone()
+        return b.matrix_local.copy() if b is not None else None
+
+    def matrix_armature_space_relative(self, parent: BoneRef | None, mode: BoneMode) -> mathutils.Matrix | None:
+        """Bone->parent relative matrix in armature space. If parent missing, returns self matrix."""
+        m = self.matrix_armature_space(mode)
+        if m is None:
             return None
 
-    def world_matrix(self) -> mathutils.Matrix | None:
-        """Best-effort bone world matrix in Blender space.
+        if parent is None:
+            return m
 
-        - Prefer pose bone matrix (captures current pose)
-        - Fall back to rest bone matrix_local
-        """
-        arm_w = getattr(self.armature_obj, "matrix_world", None)
-        if arm_w is None:
-            return None
+        pm = parent.matrix_armature_space(mode)
+        return (pm.inverted_safe() @ m) if pm is not None else m
 
-        if (pb := self.pose_bone()) is not None:
-            # PoseBone.matrix is in armature object space.
-            return arm_w @ pb.matrix
-
-        if (b := self.data_bone()) is not None:
-            # Bone.matrix_local is in armature space (rest pose).
-            return arm_w @ b.matrix_local
-
-        return None
+    def world_matrix(self, mode: BoneMode = BoneMode.POSE) -> mathutils.Matrix | None:
+        """Best-effort bone world matrix in Blender space."""
+        arm_w = self.armature_obj.matrix_world
+        m_arm = self.matrix_armature_space(mode)
+        return (arm_w @ m_arm) if m_arm is not None else None

@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import TYPE_CHECKING, Callable
 
+from ..ir.model import NodeKind
+from ..model.shapes import ShapeMode
+from .animations import resolve_animations
 from .armatures import resolve_armatures
 from .child_of_constraint import resolve_bone_childof
 from .files import resolve_files
@@ -90,7 +93,17 @@ def resolve_all(ctx: ExportContext) -> None:
 
 def _finalize_shapes_and_materials(ctx: ExportContext) -> None:
     # Shape build & materialIds must run before material resolve and shape vertex reqs after material resolve
-    valid_shapes = resolve_shapes_build(ctx)
+    skinned_objs = set()
+    for n in ctx.ir.iter_nodes(kind=NodeKind.SHAPE):
+        if ctx.shapes.get_entry(n.shape.shape_id).mode is ShapeMode.SKINNED_MESH:
+            skinned_objs.add(n.obj)
+    if skinned_objs:
+        from ..blender.evaluated_mesh import temporary_disable_armature_modifiers
+
+        with temporary_disable_armature_modifiers(ctx, skinned_objs):
+            valid_shapes = resolve_shapes_build(ctx)
+    else:
+        valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)
     resolve_material_entries(ctx)
     resolve_shape_vertex_requirements(ctx, valid_shapes)
@@ -128,6 +141,7 @@ _PHASES: tuple[ResolvePhase, ...] = (
         "final",
         (
             ResolvePass("matrices", resolve_matrices),
+            ResolvePass("animations", resolve_animations),
             ResolvePass("mappings", collect_i3d_mappings),
             ResolvePass("user_attributes", resolve_user_attributes),
             ResolvePass("files", resolve_files),

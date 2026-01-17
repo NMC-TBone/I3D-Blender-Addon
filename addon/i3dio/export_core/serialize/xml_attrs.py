@@ -8,7 +8,8 @@ from ... import xml_i3d
 
 if TYPE_CHECKING:
     import xml.etree.ElementTree as ET
-    from ..ir import SceneNode, EmitAttrs
+
+    from ..ir import EmitAttrs, SceneNode
 
 
 def write_attributes(elem: ET.Element, attrs: Mapping[str, object]) -> None:

@@ -10,6 +10,7 @@ import bpy
 from mathutils import Matrix
 
 from ..blender.bones import BoneRef
+from .animation import AnimationIR
 
 BlenderRef = bpy.types.Object | bpy.types.Collection | BoneRef
 
@@ -143,6 +144,8 @@ class ExportIR:
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     node_order: list[int] = field(default_factory=list)  # node ids in creation order (stable)
     index: IRIndex = field(default_factory=IRIndex)
+
+    animations: AnimationIR = field(default_factory=AnimationIR)
 
     # Caches for fast hierarchy queries (built-on-demand)
     _children_cache: dict[int | None, list[int]] | None = None  # parent_id -> [child_ids]
