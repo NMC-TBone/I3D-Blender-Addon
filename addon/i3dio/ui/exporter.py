@@ -201,9 +201,14 @@ class I3D_IO_OT_export(Operator, ExportHelper):
                 "Merge the child objects of empties with Merge Children enabled into a single exported mesh",
             ),
             ('ANIMATIONS', "Animations", "Export animations"),
+            (
+                'MOTION_PATH_ARRAYS',
+                "Motion Path Arrays (DDS)",
+                "Export Motion Path Array DDS textures for objects with Motion Path Array enabled",
+            ),
         ),
         options={'ENUM_FLAG'},
-        default={'MERGE_GROUPS', 'SKINNED_MESHES', 'MERGE_CHILDREN'},
+        default={'MERGE_GROUPS', 'SKINNED_MESHES', 'MERGE_CHILDREN', 'MOTION_PATH_ARRAYS'},
     )
 
     copy_files: BoolProperty(
