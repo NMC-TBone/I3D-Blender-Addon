@@ -4,7 +4,8 @@ from bpy.types import Operator, Panel
 from bpy_extras.io_utils import ExportHelper, orientation_helper
 
 from .. import __package__ as base_package
-from .. import exporter, xml_i3d
+from ..export_entrypoint import export_blend_to_i3d
+from ..xml_i3d import FILE_EXT
 
 classes = []
 
@@ -78,9 +79,9 @@ class I3D_IO_OT_export(Operator, ExportHelper):
     bl_label = "Export I3D"
     bl_options = {'UNDO', 'PRESET'}  # 'PRESET' enables the preset dialog for saving settings as preset
 
-    filename_ext = xml_i3d.FILE_EXT
+    filename_ext = FILE_EXT
     filter_glob: StringProperty(
-        default=f"*{xml_i3d.FILE_EXT}",
+        default=f"*{FILE_EXT}",
         options={'HIDDEN'},
         maxlen=255,
     )
@@ -339,7 +340,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
         original_frame = context.scene.frame_current
         context.scene.frame_set(0)
 
-        status = exporter.export_blend_to_i3d(self, context, self.filepath, self.axis_forward, self.axis_up, settings)
+        status = export_blend_to_i3d(self, context, self.filepath, self.axis_forward, self.axis_up, settings)
 
         context.scene.frame_set(original_frame)
 
