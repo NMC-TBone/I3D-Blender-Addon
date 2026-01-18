@@ -67,7 +67,7 @@ def evaluated_mesh_for_export(
     mesh.transform(conv)
     if conv.is_negative:
         mesh.flip_normals()
-        ctx.object_reporter(obj, "evaluated_mesh").debug("Conversion matrix has negative scale; flipped normals")
+        rep.debug("Conversion matrix has negative scale; flipped normals")
 
     mesh.calc_loop_triangles()
     return ev_obj, mesh

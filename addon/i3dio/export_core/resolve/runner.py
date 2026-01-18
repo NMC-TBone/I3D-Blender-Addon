@@ -8,6 +8,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Callable
 
 from ..ir.model import NodeKind
+from ..messages import Severity
 from ..model.shapes import ShapeMode
 from .animations import resolve_animations
 from .armatures import resolve_armatures
@@ -85,7 +86,7 @@ def resolve_all(ctx: ExportContext) -> None:
                 try:
                     p.run(ctx)
                 except Exception:
-                    rep.error("Resolve pass failed: %s", label)
+                    rep.exception("Resolve pass failed: %s", label, severity=Severity.ERROR)
                     raise
 
     _log_summary(ctx, rep)

@@ -13,4 +13,5 @@ if _needs_reload:
     emit_scene = importlib.reload(emit_scene)
     emit_user_attributes = importlib.reload(emit_user_attributes)
     indexed_triangle_set_stream = importlib.reload(indexed_triangle_set_stream)
-    print("i3dio export_core.serialize reloaded")
+    if getattr(bpy.app, "debug", False) or getattr(bpy.app, "debug_python", False):
+        print("i3dio export_core.serialize reloaded")

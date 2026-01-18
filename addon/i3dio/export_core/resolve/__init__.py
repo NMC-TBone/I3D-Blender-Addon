@@ -14,7 +14,8 @@ if _needs_reload:
     runner = importlib.reload(runner)
     animations = importlib.reload(animations)
     user_attributes = importlib.reload(user_attributes)
-    print("i3dio export_core.resolve reloaded")
+    if getattr(bpy.app, "debug", False) or getattr(bpy.app, "debug_python", False):
+        print("i3dio export_core.resolve reloaded")
 
 # Re-export the public entrypoint
 resolve_all = runner.resolve_all
