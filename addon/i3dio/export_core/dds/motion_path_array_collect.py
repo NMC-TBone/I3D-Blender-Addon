@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from math import tau
+from typing import Protocol
 
 import bpy
 import mathutils
 import numpy as np
 from bpy_extras.io_utils import axis_conversion
-from typing_extensions import Protocol
 
 from ... import debugging
 from ...utility import sort_blender_objects_by_outliner_ordering
@@ -43,7 +43,9 @@ def collect_motion_path_array(
         float16 numpy array ready for DDS writing, or None if no data / not configured.
     """
     if logger is None:
-        logger = debugging.addon_logger
+        logger = debugging.ContextAdapter(
+            debugging.get_logger("export"), {"object_name": obj.name, "prefix": "motion_path_array"}
+        )
     props = obj.i3d_motion_path_array
     cfg = MPAConfig(
         include_position=props.include_position,
@@ -192,7 +194,7 @@ def _collect_hierarchical_gn(pc: bpy.types.PointCloud, cfg: MPAConfig, logger: L
             arr[zi, yj, num_items:max_x] = last_item
 
         # Fill empty Y-groups by carrying nearest valid group (your old behavior)
-        row_nonempty = np.array([np.any(arr[zi, y]) for y in range(y_count)], dtype=bool)
+        row_nonempty = np.array([(zi, y) in buckets for y in range(y_count)], dtype=bool)
         if row_nonempty.any():
             first = int(np.argmax(row_nonempty))
             first_data = arr[zi, first].copy()

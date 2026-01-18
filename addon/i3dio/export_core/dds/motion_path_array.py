@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -8,7 +7,7 @@ from typing import Iterable
 import bpy
 
 from ... import debugging
-from .motion_path_array_collect import collect_motion_path_array
+from .motion_path_array_collect import LogSink, collect_motion_path_array
 from .writer import write_dds_dx10
 
 
@@ -20,7 +19,7 @@ class MotionPathArrayExportSummary:
 
 
 def export_motion_path_array(
-    obj: bpy.types.Object, *, depsgraph: bpy.types.Depsgraph, logger: logging.Logger | None = None
+    obj: bpy.types.Object, *, depsgraph: bpy.types.Depsgraph, logger: LogSink | None = None
 ) -> tuple[str, str]:
     """Export Motion Path Array DDS for a single object.
 
@@ -28,7 +27,9 @@ def export_motion_path_array(
         (status, message) where status is one of: SUCCESS, SKIP, FAIL.
     """
     if logger is None:
-        logger = debugging.addon_logger
+        logger = debugging.ContextAdapter(
+            debugging.get_logger("export"), {"object_name": obj.name, "prefix": "motion_path_array"}
+        )
 
     gathered_array = collect_motion_path_array(obj, depsgraph=depsgraph, logger=logger)
 
@@ -39,7 +40,7 @@ def export_motion_path_array(
         logger.info(msg)
         return "SKIP", msg
 
-    if not filepath.endswith(".dds"):
+    if not filepath.lower().endswith(".dds"):
         filepath += ".dds"
 
     try:
@@ -56,7 +57,7 @@ def export_motion_path_array(
 
 
 def export_motion_path_arrays(
-    objects: Iterable[bpy.types.Object], *, depsgraph: bpy.types.Depsgraph, logger: logging.Logger | None = None
+    objects: Iterable[bpy.types.Object], *, depsgraph: bpy.types.Depsgraph, logger: LogSink | None = None
 ) -> MotionPathArrayExportSummary:
     """Export Motion Path Array DDS for all enabled objects in an iterable."""
     success = skipped = failed = 0
