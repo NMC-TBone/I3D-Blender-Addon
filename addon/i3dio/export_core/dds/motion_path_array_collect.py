@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, replace
 from math import tau
-from typing import Protocol
 
 import bpy
 import mathutils
@@ -16,12 +16,7 @@ from ...utility import sort_blender_objects_by_outliner_ordering
 CONVERSION_MATRIX: mathutils.Matrix = axis_conversion(to_forward='-Z', to_up='Y').to_4x4()
 CONVERSION_MATRIX_INVERSE = CONVERSION_MATRIX.inverted()
 
-
-class LogSink(Protocol):
-    def debug(self, msg: str, *args, **kwargs) -> None: ...
-    def info(self, msg: str, *args, **kwargs) -> None: ...
-    def warning(self, msg: str, *args, **kwargs) -> None: ...
-    def exception(self, msg: str, *args, **kwargs) -> None: ...
+LogSink = logging.Logger | logging.LoggerAdapter
 
 
 @dataclass(frozen=True, slots=True)
