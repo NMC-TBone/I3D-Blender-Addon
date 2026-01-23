@@ -13,10 +13,10 @@ from .. import debugging
 from .ids import IdAllocator
 from .ir import ExportIR, SceneBuilder, SceneNode
 from .messages import ExportMessages
-from .registries.files import FileTable
-from .registries.materials import MaterialTable
-from .registries.shapes import ShapeTable
 from .reporting import Reporter
+from .resources.files import FileTable
+from .resources.materials import MaterialTable
+from .resources.shapes import ShapeTable
 
 T = TypeVar("T")
 

@@ -9,17 +9,18 @@ from typing import TYPE_CHECKING, Callable
 
 from ..ir.model import NodeKind
 from ..messages import Severity
-from ..model.shapes import ShapeMode
-from .animations import resolve_animations
-from .armatures import resolve_armatures
-from .child_of_constraint import resolve_bone_childof
-from .files import resolve_files
-from .kinds import resolve_kind_for_node
-from .mappings import collect_i3d_mappings
-from .materials import resolve_material_entries
-from .matrices import resolve_matrices
-from .names import finalize_name_for_node
-from .properties import resolve_properties
+from ..resources.shapes import ShapeMode
+from .animations.resolve import resolve_animations
+from .common.armatures import resolve_armatures
+from .common.child_of_constraint import resolve_bone_childof
+from .common.files import resolve_files
+from .common.kinds import resolve_kind_for_node
+from .common.mappings import collect_i3d_mappings
+from .common.materials import resolve_material_entries
+from .common.matrices import resolve_matrices
+from .common.names import finalize_name_for_node
+from .common.properties import resolve_properties
+from .common.user_attributes import resolve_user_attributes
 from .shapes import (
     finalize_shape_material_ids,
     resolve_bounding_volumes,
@@ -30,7 +31,6 @@ from .shapes import (
     resolve_shapes_build,
     resolve_skinned_meshes,
 )
-from .user_attributes import resolve_user_attributes
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext

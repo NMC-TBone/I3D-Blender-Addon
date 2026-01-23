@@ -7,7 +7,7 @@ from xml.sax.saxutils import quoteattr
 from ... import xml_i3d
 
 if TYPE_CHECKING:
-    from ..model.its import BuiltITS
+    from ..geometry.mesh.its import BuiltITS
 
 CHUNK_LINES = 30_000  # number of lines to buffer before writing to file, more or less a random guess
 
