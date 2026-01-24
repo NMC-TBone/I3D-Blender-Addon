@@ -19,7 +19,6 @@ from .export_core.reporting import report_messages_to_operator
 from .utility import get_fs_data_path
 
 logger = logging.getLogger(__name__)
-logger.debug(f"Loading: {__name__}")
 
 BINARIZER_TIMEOUT_IN_SECONDS = 30
 
