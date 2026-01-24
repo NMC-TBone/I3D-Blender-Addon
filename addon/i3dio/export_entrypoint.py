@@ -1,4 +1,4 @@
-from __future__ import annotations  # Enables python 4.0 annotation typehints fx. class self-referencing
+from __future__ import annotations
 
 import logging
 import subprocess
