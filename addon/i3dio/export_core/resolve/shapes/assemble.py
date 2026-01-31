@@ -100,7 +100,16 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
     wrote_nodes = 0
     for shape_id, nodes in shape_nodes_by_id.items():
         built = ctx.shapes.get_built(shape_id)
-        if built is None or not built.material_ids:
+        if built is None:
+            for n in nodes:
+                n.shape.material_ids = None
+            continue
+
+        # Only IndexedTriangleSet has materials; NurbsCurve doesn't
+        if built.kind is not ShapeKind.INDEXED_TRIANGLE_SET:
+            continue
+
+        if not built.material_ids:
             for n in nodes:
                 n.shape.material_ids = None
             continue
