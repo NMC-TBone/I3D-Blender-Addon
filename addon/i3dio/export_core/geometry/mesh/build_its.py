@@ -154,6 +154,23 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
     if indices.size == 0 or indices.size % 3 != 0:
         return None
 
+    # Deduplicate vertices to reduce file size and memory usage
+    positions, normals, uvs, color, g, bi, bw, bi4, indices = _deduplicate_vertices(
+        merged.positions,
+        merged.normals,
+        merged.uvs,
+        merged.color,
+        merged.g,
+        merged.bi,
+        merged.bw,
+        merged.bi4,
+        indices,
+    )
+
+    # Update subset vertex ranges after deduplication
+    for subset in subsets:
+        subset.num_vertices = positions.shape[0]
+
     # Resolve material slot names on subsets
     _resolve_subset_slot_names(ctx, entry, subsets, material_kind)
 
@@ -161,18 +178,103 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
         name=entry.name,
         shape_id=entry.id,
         material_kind=material_kind,
-        positions=merged.positions,
-        normals=merged.normals,
+        positions=positions,
+        normals=normals,
         indices=indices,
         subsets=subsets,
-        uvs=merged.uvs,
-        color=merged.color,
-        g=merged.g,
-        bi=merged.bi,
-        bw=merged.bw,
-        bi4=merged.bi4,
+        uvs=uvs,
+        color=color,
+        g=g,
+        bi=bi,
+        bw=bw,
+        bi4=bi4,
         attrs=entry.attrs,
     )
+
+
+def _deduplicate_vertices(
+    positions: np.ndarray,
+    normals: np.ndarray,
+    uvs: list[np.ndarray],
+    color: np.ndarray | None,
+    g: np.ndarray | None,
+    bi: np.ndarray | None,
+    bw: np.ndarray | None,
+    bi4: np.ndarray | None,
+    indices: np.ndarray,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    list[np.ndarray],
+    np.ndarray | None,
+    np.ndarray | None,
+    np.ndarray | None,
+    np.ndarray | None,
+    np.ndarray | None,
+    np.ndarray,
+]:
+    """
+    Deduplicate vertices by welding identical attribute combinations.
+
+    Creates a structured array containing all vertex attributes, uses np.unique()
+    to find unique vertices, and remaps triangle indices accordingly.
+
+    Returns deduplicated (positions, normals, uvs, color, g, bi, bw, bi4, indices).
+    """
+    vcount = positions.shape[0]
+
+    # Build dtype for vertex comparison
+    dtype_fields = [
+        ("position", "(3,)f4"),
+        ("normal", "(3,)f4"),
+    ]
+    for i in range(len(uvs)):
+        dtype_fields.append((f"uv{i}", "(2,)f4"))
+    if color is not None:
+        dtype_fields.append(("color", "(4,)f4"))
+    if g is not None:
+        dtype_fields.append(("g", "f4"))
+    if bi is not None:
+        dtype_fields.append(("bi", "i4"))
+    if bw is not None and bi4 is not None:
+        dtype_fields.append(("bw", "(4,)f4"))
+        dtype_fields.append(("bi4", "(4,)i4"))
+
+    vertex_dtype = np.dtype(dtype_fields)
+
+    # Pack all vertex attributes into structured array
+    packed = np.empty(vcount, dtype=vertex_dtype)
+    packed["position"] = positions
+    packed["normal"] = normals
+    for i, uv in enumerate(uvs):
+        packed[f"uv{i}"] = uv
+    if color is not None:
+        packed["color"] = color
+    if g is not None:
+        packed["g"] = g
+    if bi is not None:
+        packed["bi"] = bi
+    if bw is not None and bi4 is not None:
+        packed["bw"] = bw
+        packed["bi4"] = bi4
+
+    # Find unique vertices and inverse mapping
+    unique_verts, inverse_indices = np.unique(packed, return_inverse=True)
+
+    # Remap triangle indices
+    new_indices = inverse_indices[indices]
+
+    # Unpack deduplicated attributes
+    new_positions = unique_verts["position"]
+    new_normals = unique_verts["normal"]
+    new_uvs = [unique_verts[f"uv{i}"] for i in range(len(uvs))]
+    new_color = unique_verts["color"] if color is not None else None
+    new_g = unique_verts["g"] if g is not None else None
+    new_bi = unique_verts["bi"] if bi is not None else None
+    new_bw = unique_verts["bw"] if bw is not None and bi4 is not None else None
+    new_bi4 = unique_verts["bi4"] if bw is not None and bi4 is not None else None
+
+    return new_positions, new_normals, new_uvs, new_color, new_g, new_bi, new_bw, new_bi4, new_indices
 
 
 def _resolve_subset_slot_names(
