@@ -53,7 +53,7 @@ def _build_ir(ctx: ExportContext, *, context: bpy.types.Context) -> list[bpy.typ
     if source_collection:
         reporter.info("Exporting from collection export %r", source_collection.name)
         scope_objects = list(source_collection.all_objects)
-        traverse.add_collection(ctx, source_collection, parent_id=None)
+        traverse.add_collection(ctx, source_collection, parent_id=None, emit_self=False)
         return scope_objects
 
     match op.selection:
@@ -63,9 +63,10 @@ def _build_ir(ctx: ExportContext, *, context: bpy.types.Context) -> list[bpy.typ
             traverse.add_collection(ctx, context.scene.collection, parent_id=None, emit_self=False)
             return scope_objects
         case "ACTIVE_COLLECTION":
-            reporter.info("Exporting active collection %r", context.view_layer.active_layer_collection.collection.name)
-            scope_objects = list(context.view_layer.active_layer_collection.collection.all_objects)
-            traverse.add_collection(ctx, context.view_layer.active_layer_collection.collection, parent_id=None)
+            active_layer_collection = context.view_layer.active_layer_collection.collection
+            reporter.info("Exporting active collection %r", active_layer_collection.name)
+            scope_objects = list(active_layer_collection.all_objects)
+            traverse.add_collection(ctx, active_layer_collection, parent_id=None, emit_self=False)
             return scope_objects
         case "ACTIVE_OBJECT":
             if context.active_object is None:
