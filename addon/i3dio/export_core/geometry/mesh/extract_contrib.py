@@ -10,7 +10,7 @@ import numpy as np
 from ...blender.evaluated_mesh import evaluated_mesh_for_export, free_evaluated_mesh
 from ...resources.shapes import ShapeContributor
 from .its import MaterialKeyKind
-from .material_resolve import resolve_slots
+from .material_resolve import get_materials_for_export, resolve_slots
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
@@ -41,6 +41,10 @@ class ItsContributorStream:
     blend_weights: np.ndarray | None = None  # (L,4) float32
     blend_indices: np.ndarray | None = None  # (L,4) int32
 
+    # True if we cannot safely defer SLOT_INDEX material resolution to finalize.
+    # In that case we force MaterialKeyKind.MATERIAL_ID immediately.
+    cannot_defer_material_resolution: bool = False
+
 
 def extract_contrib_its(
     ctx: ExportContext,
@@ -52,8 +56,11 @@ def extract_contrib_its(
     material_kind: MaterialKeyKind = MaterialKeyKind.SLOT_INDEX,
 ) -> ItsContributorStream | None:
     obj = contrib.obj
-    if not isinstance(obj, bpy.types.Object) or not isinstance(obj.data, bpy.types.Mesh):
+    if not isinstance(obj, bpy.types.Object):
         return None
+
+    # Note: We don't check obj.data type here because curves-with-geometry
+    # (bevel/extrusion) will evaluate to a mesh via to_mesh().
 
     ev_obj, mesh = evaluated_mesh_for_export(ctx, obj, reference_frame=contrib.reference_frame)
 
@@ -102,10 +109,19 @@ def extract_contrib_its(
 
         tri_mat_idx = poly_mat[tri_poly]  # (T,) slot indices from mesh
 
-        slot_materials = [s.material for s in ev_obj.material_slots] if ev_obj.material_slots else list(mesh.materials)
+        # ---- Determine material source ----
+        # finalize_shape_material_ids uses the ORIGINAL object's slots. If evaluated object
+        # has different materials (e.g. from Geometry Nodes), we must resolve immediately.
+        max_mat_idx = int(tri_mat_idx.max()) if tri_mat_idx.size > 0 else 0
+        mat_source = get_materials_for_export(obj, ev_obj, mesh, max_mat_idx)
+
+        # If materials differ from original, force MATERIAL_ID mode to resolve now.
+        effective_material_kind = MaterialKeyKind.MATERIAL_ID if mat_source.needs_immediate_resolve else material_kind
 
         # ---- material keys per tri ----
-        tri_mat_key = _resolve_tri_material_keys(ctx, obj, tri_mat_idx, slot_materials, material_kind, num_triangles)
+        tri_mat_key = _resolve_tri_material_keys(
+            ctx, obj, tri_mat_idx, mat_source.materials, effective_material_kind, num_triangles
+        )
 
         # ---- vertex colors ----
         color = None
@@ -145,6 +161,7 @@ def extract_contrib_its(
             bind_idx=bind_idx,
             blend_weights=blend_weights,
             blend_indices=blend_indices,
+            cannot_defer_material_resolution=mat_source.needs_immediate_resolve,
         )
 
     finally:

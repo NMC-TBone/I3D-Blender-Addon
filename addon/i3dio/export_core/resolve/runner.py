@@ -24,6 +24,7 @@ from .common.user_attributes import resolve_user_attributes
 from .shapes import (
     finalize_shape_material_ids,
     resolve_bounding_volumes,
+    resolve_curve_shapes,
     resolve_merge_children,
     resolve_merge_groups,
     resolve_shape_links,
@@ -95,8 +96,10 @@ def resolve_all(ctx: ExportContext) -> None:
 def _finalize_shapes_and_materials(ctx: ExportContext) -> None:
     # Shape build & materialIds must run before material resolve and shape vertex reqs after material resolve
     skinned_objs = set()
-    for n in ctx.ir.iter_nodes(kind=NodeKind.SHAPE):
-        if ctx.shapes.get_entry(n.shape.shape_id).mode is ShapeMode.SKINNED_MESH:
+    # Only mesh objects can be skinned meshes
+    for n in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, source_object_type='MESH'):
+        entry = ctx.shapes.get_entry(n.shape.shape_id)
+        if entry is not None and entry.mode is ShapeMode.SKINNED_MESH:
             skinned_objs.add(n.obj)
     if skinned_objs:
         from ..blender.evaluated_mesh import temporary_disable_armature_modifiers
@@ -126,6 +129,7 @@ _PHASES: tuple[ResolvePhase, ...] = (
             ResolvePass("merge_children", resolve_merge_children),
             ResolvePass("merge_groups", resolve_merge_groups),
             ResolvePass("skinned_meshes", resolve_skinned_meshes),
+            ResolvePass("curve_shapes", resolve_curve_shapes),  # Creates derived Shape nodes for splines
             ResolvePass("shape_links", resolve_shape_links),
             ResolvePass("bounding_volumes", resolve_bounding_volumes),
         ),

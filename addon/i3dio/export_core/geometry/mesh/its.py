@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Literal
 
 import numpy as np
 
@@ -76,3 +77,22 @@ class BuiltITS(BuiltShape):
     @property
     def triangle_count(self) -> int:
         return int(self.indices.shape[0] // 3)
+
+
+CurveType = Literal["linear", "cubic"]
+
+
+@dataclass(slots=True)
+class BuiltNurbsCurve(BuiltShape):
+    """Built NURBS curve shape."""
+
+    kind: ShapeKind = field(default=ShapeKind.NURBS_CURVE, init=False)
+
+    control_positions: Vec3f = field(repr=False, default=None)  # (N,3) float32
+    curve_type: CurveType = "cubic"
+    degree: int = 3
+    is_cyclic: bool = False
+
+    @property
+    def point_count(self) -> int:
+        return int(self.control_positions.shape[0])

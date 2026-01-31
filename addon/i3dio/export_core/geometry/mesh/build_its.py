@@ -95,6 +95,8 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
     if not entry.contributors:
         return None
 
+    # Start with SLOT_INDEX for NORMAL shapes (supports per-instance material overrides).
+    # Other modes use MATERIAL_ID directly (merged geometry with different slot layouts).
     material_kind = MaterialKeyKind.SLOT_INDEX if entry.mode == ShapeMode.NORMAL else MaterialKeyKind.MATERIAL_ID
 
     # Extract mesh data from all contributors
@@ -114,7 +116,16 @@ def build_indexed_triangle_set(ctx: ExportContext, entry: ShapeEntry) -> BuiltIT
         is not None
     ]
     if not streams:
+        ctx.reporter("build_its").warning("No valid contributors for IndexedTriangleSet shape %r", entry.name)
         return None
+
+    # If any contributor cannot defer material resolution (e.g. Geometry Nodes materials),
+    # switch to MATERIAL_ID mode since those contributors already resolved materials immediately.
+    if material_kind == MaterialKeyKind.SLOT_INDEX and any(s.cannot_defer_material_resolution for s in streams):
+        ctx.reporter("build_its").debug(
+            "Shape %r requires immediate material resolution; using MATERIAL_ID mode", entry.name
+        )
+        material_kind = MaterialKeyKind.MATERIAL_ID
 
     # Ensure generic attribute is enabled if detected in any stream (when NORMAL shape have e.g. Geometry Nodes)
     if entry.mode == ShapeMode.NORMAL and any(s.generic is not None for s in streams):

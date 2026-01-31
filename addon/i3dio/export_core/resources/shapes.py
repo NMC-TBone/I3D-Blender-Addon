@@ -14,7 +14,7 @@ from .base import IdEntryTable
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
-    from ..geometry.mesh.its import BuiltITS
+    from ..geometry.built import BuiltShape
 
 
 # ------------------------------------------------------------------------------
@@ -29,6 +29,7 @@ class ShapeMode(Enum):
     MERGE_GROUP = auto()  # Multiple meshes merged, keyed by root object
     MERGE_CHILDREN = auto()  # Children merged with generic values
     SKINNED_MESH = auto()  # Armature-driven, keyed per object
+    NURBS_CURVE = auto()  # NurbsCurve spline, keyed by (object, spline_index)
 
 
 @dataclass(slots=True)
@@ -51,6 +52,7 @@ class ShapeKey:
     mode: ShapeMode = ShapeMode.NORMAL
     merge_group_index: int | None = None
     slot_name_signature: tuple[str | None, ...] | None = None
+    spline_index: int | None = None  # For NURBS_CURVE mode
 
     @classmethod
     def for_mesh(
@@ -96,6 +98,17 @@ class ShapeKey:
             object_ptr=object_ptr,
             apply_modifiers=apply_modifiers,
             mode=ShapeMode.SKINNED_MESH,
+        )
+
+    @classmethod
+    def for_curve(cls, *, object_ptr: int, spline_index: int) -> "ShapeKey":
+        """Key for a NurbsCurve shape (one spline from a curve object)."""
+        return cls(
+            data_ptr=0,
+            object_ptr=object_ptr,
+            apply_modifiers=False,  # curves don't use modifier evaluation for NurbsCurve
+            mode=ShapeMode.NURBS_CURVE,
+            spline_index=spline_index,
         )
 
 
@@ -146,7 +159,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
     ctx: ExportContext
     _by_key: dict[ShapeKey, int] = field(default_factory=dict)
     _entries: dict[int, ShapeEntry] = field(default_factory=dict)
-    built_by_id: dict[int, BuiltITS | None] = field(default_factory=dict)
+    built_by_id: dict[int, BuiltShape | None] = field(default_factory=dict)
 
     def _alloc_entry(self, *, key: ShapeKey, name: str) -> ShapeEntry:
         sid = self.ctx.ids.alloc(IdKind.SHAPE)
@@ -154,7 +167,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         self.register(key=key, entry_id=sid, entry=entry)
         return entry
 
-    def get_built(self, shape_id: int) -> BuiltITS | None:
+    def get_built(self, shape_id: int) -> BuiltShape | None:
         """
         Build (or fetch cached) built geometry for shape_id.
         Caches None as well to avoid rebuilding known-invalid shapes.
@@ -162,10 +175,18 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         if shape_id in self.built_by_id:
             return self.built_by_id[shape_id]
 
-        # Lazy import to avoid circular dependency
-        from ..geometry.mesh.build_its import build_indexed_triangle_set
+        entry = self.get_entry(shape_id)
 
-        built = build_indexed_triangle_set(self.ctx, self.get_entry(shape_id))
+        # Dispatch based on shape mode
+        if entry.mode is ShapeMode.NURBS_CURVE:
+            from ..geometry.curve.build_nurbs import build_nurbs_curve
+
+            built = build_nurbs_curve(self.ctx, entry)
+        else:
+            from ..geometry.mesh.build_its import build_indexed_triangle_set
+
+            built = build_indexed_triangle_set(self.ctx, entry)
+
         self.built_by_id[shape_id] = built  # cache success OR failure
         return built
 
@@ -214,6 +235,26 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         entry.contributors.append(ShapeContributor(obj=obj, reference_frame=None))
         return entry
 
+    def get_or_add_curve(self, obj: bpy.types.Object, *, spline_index: int) -> int:
+        """Get or create a NurbsCurve shape entry for a specific spline in a curve object.
+
+        Args:
+            obj: The Blender curve object.
+            spline_index: Index of the spline within the curve.
+
+        Returns:
+            The shape ID for this (object, spline) combination.
+        """
+        key = ShapeKey.for_curve(object_ptr=obj.as_pointer(), spline_index=spline_index)
+        if (sid := self.get_id(key)) is not None:
+            return sid
+
+        curve_data = obj.data
+        spline_name = f"{curve_data.name}_spline{spline_index}"
+        entry = self._alloc_entry(key=key, name=spline_name)
+        entry.contributors.append(ShapeContributor(obj=obj, reference_frame=None))
+        return entry.id
+
     def link_node(self, node: SceneNode) -> None:
         """Link a SceneNode to a ShapeEntry by setting node.shape_id."""
         # Check if already linked by inspecting shape_id directly
@@ -228,10 +269,10 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
                 if node._shape is None:
                     node._shape = ShapeSceneExt()
                 node._shape.shape_id = shape_id
-            case 'CURVE':
-                # TODO: add curve (NrubsCurve) implementation
-                to_transform_group(node)
             case _:
+                # Curves are handled by resolve_curve_shapes before link_node runs:
+                # - Curves with bevel/extrusion have source_object_type set to 'MESH'
+                # - NurbsCurve splines are created via add_derived_shape() with shape_id already set
                 to_transform_group(node)
 
     def iter_built(self):

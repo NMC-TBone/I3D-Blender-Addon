@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from mathutils import Vector
 
-from ...ir import NodeKind
+from ...ir import NodeKind, SourceKind
 
 if TYPE_CHECKING:
     import bpy
@@ -40,7 +40,13 @@ def _bv_center_and_radius_export_local(
 
 
 def resolve_bounding_volumes(ctx: ExportContext) -> None:
-    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, emitted_only=True):
+    # Only actual mesh objects have the bounding_volume_object property.
+    # Note: source_object_type can be overridden (e.g., curves-with-geometry become 'MESH'),
+    # so we check the actual object type instead.
+    # Also skip derived nodes (e.g., NurbsCurve spline shapes) which don't have obj.
+    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, source_kind=SourceKind.OBJECT, emitted_only=True):
+        if node.obj.type != 'MESH':
+            continue
         if (bv := node.obj.data.i3d_attributes.bounding_volume_object) is None:
             continue
 

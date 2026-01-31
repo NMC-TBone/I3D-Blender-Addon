@@ -13,7 +13,7 @@ _OBJECT_TYPE_TO_KIND: dict[str, NodeKind] = {
     "CAMERA": NodeKind.CAMERA,
     "LIGHT": NodeKind.LIGHT,
     "MESH": NodeKind.SHAPE,
-    "CURVE": NodeKind.SHAPE,
+    "CURVE": NodeKind.TRANSFORM_GROUP,  # Resolved properly later, but if more than 1 spline, CURVE ob will be parent
     "EMPTY": NodeKind.TRANSFORM_GROUP,
     # ARMATURE intentionally not here -> TG
 }

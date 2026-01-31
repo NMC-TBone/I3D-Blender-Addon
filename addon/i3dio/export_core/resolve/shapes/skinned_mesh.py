@@ -16,7 +16,8 @@ def resolve_skinned_meshes(ctx: ExportContext) -> None:
     bones_by_arm_ptr = ctx.ir.index.bone_nodes_by_armature_ptr
 
     processed = 0
-    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE):
+    # Only mesh objects can be skinned meshes (have modifiers and vertex groups)
+    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, source_object_type='MESH'):
         obj = node.obj
         obj_rep = ctx.object_reporter(obj, "skinned_mesh")
         # Find armature modifiers with valid armature object.

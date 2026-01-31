@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
+from ...geometry.built import ShapeKind
 from ...geometry.mesh.its import MaterialKeyKind
 from ...geometry.mesh.material_resolve import resolve_slots
 from ...ir import NodeKind, SceneNode, clear_shape_binding, to_transform_group
@@ -47,18 +48,28 @@ def resolve_shapes_build(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
         built = ctx.shapes.get_built(shape_id)
         if built is None:
             entry = ctx.shapes.get_entry(shape_id)
-            rep.warning("Shape %r produced no valid mesh; exporting as TransformGroup", entry.name)
+            rep.warning("Shape %r produced no valid geometry; exporting as TransformGroup", entry.name)
             for n in nodes:
                 to_transform_group(n)
             continue
 
-        rep.debug(
-            "Shape id=%d built: vertices=%d triangles=%d materials=%d",
-            shape_id,
-            built.vertex_count,
-            built.triangle_count,
-            len(built.material_ids),
-        )
+        # Log debug info based on shape type
+        if built.kind is ShapeKind.INDEXED_TRIANGLE_SET:
+            rep.debug(
+                "Shape id=%d built ITS: vertices=%d triangles=%d materials=%d",
+                shape_id,
+                built.vertex_count,
+                built.triangle_count,
+                len(built.material_ids),
+            )
+        elif built.kind is ShapeKind.NURBS_CURVE:
+            rep.debug(
+                "Shape id=%d built NurbsCurve: points=%d type=%s cyclic=%s",
+                shape_id,
+                built.point_count,
+                built.curve_type,
+                built.is_cyclic,
+            )
         valid[shape_id] = nodes
 
     return valid

@@ -8,7 +8,7 @@ import bpy
 
 from ..blender.bones import BoneRef
 from ..ids import IdKind
-from .model import NodeKind, SceneNode, SourceKind
+from .model import NodeKind, SceneNode, ShapeSceneExt, SourceKind
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -96,3 +96,43 @@ class SceneBuilder:
             source_object_type=None,
             parent_id=parent_id,
         )
+
+    def add_derived_shape(
+        self,
+        *,
+        name: str,
+        parent_id: int,
+        shape_id: int,
+        source_obj: bpy.types.Object | None = None,
+    ) -> int:
+        """Add a derived Shape node not directly tied to a Blender object.
+
+        Used for programmatically generated shapes like individual splines from
+        a curve object (where one Blender object produces multiple i3D Shape nodes).
+
+        Args:
+            name: Name for the new Shape node.
+            parent_id: Parent node ID (typically the original object's node).
+            shape_id: Pre-allocated shape ID from ShapeTable.
+            source_obj: Optional source object for reference (not indexed).
+
+        Returns:
+            The new node ID.
+        """
+        node_id = self.ctx.ids.alloc(IdKind.NODE)
+
+        node = SceneNode(
+            id=node_id,
+            name=name,
+            kind=NodeKind.SHAPE,
+            parent_id=parent_id,
+            source_kind=SourceKind.OTHER,
+            source_ptr=None,
+            source_object_type=None,
+            blender_ref=source_obj,
+        )
+        # Initialize the shape extension with the pre-assigned shape_id
+        node._shape = ShapeSceneExt(shape_id=shape_id)
+
+        self.ctx.ir.add_node(node)
+        return node_id

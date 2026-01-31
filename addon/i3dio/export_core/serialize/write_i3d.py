@@ -4,12 +4,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ... import xml_i3d
+from ..geometry.built import ShapeKind
 from .emit_animation import emit_animation
 from .emit_files import emit_files
 from .emit_materials import emit_materials
 from .emit_scene import emit_scene
 from .emit_user_attributes import emit_user_attributes
 from .indexed_triangle_set_stream import write_its_stream
+from .nurbs_curve_stream import write_nurbs_curve_stream
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
@@ -35,7 +37,10 @@ def write_i3d(ctx: ExportContext) -> None:
 
     def _shapes_writer(f):
         for built in ctx.shapes.iter_built():
-            write_its_stream(f, built, indent="    ")
+            if built.kind is ShapeKind.INDEXED_TRIANGLE_SET:
+                write_its_stream(f, built, indent="    ")
+            elif built.kind is ShapeKind.NURBS_CURVE:
+                write_nurbs_curve_stream(f, built, indent="    ")
 
     rep.info("Finalizing I3D file write")
     xml_i3d.export_to_i3d_file(root=root, file_path=ctx.filepath, shapes_writer=_shapes_writer)
