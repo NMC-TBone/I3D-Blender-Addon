@@ -57,7 +57,7 @@ def _resolve_material_shading(ctx: ExportContext, entry: MaterialEntry) -> None:
     if not skip_diffuse:
         if (p := _image_path(principled.base_color_texture)) is not None:
             _set_tex("Texture", p)
-        else:
+        elif not vehicle_shader:
             _set_color("diffuseColor", "Base Color", principled.base_color)
 
     # Normalmap
