@@ -46,6 +46,9 @@ def build_indices_and_subsets(
             continue
         n = int(tcount) * 3  # indices
 
+        # All subsets share the global vertex buffer (firstVertex=0, numVertices=total).
+        # Deduplication is global, not per-subset, maximizing vertex reuse across materials.
+        # i3dConverter.exe will optimize the binary .i3d.shapes format as needed.
         subsets.append(
             BuiltSubset(
                 first_index=write,
