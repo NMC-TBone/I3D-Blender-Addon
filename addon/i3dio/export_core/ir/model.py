@@ -81,6 +81,8 @@ class SceneNode:
 
     source_ptr: int | None = None
     source_object_type: str | None = None
+    # Optional override for export decisions (e.g. CURVE exported as mesh)
+    source_object_type_override: str | None = None
     blender_ref: BlenderRef | None = None
 
     _shape: ShapeSceneExt | None = None
@@ -111,6 +113,11 @@ class SceneNode:
     @property
     def bone_ref(self) -> BoneRef:
         return cast(BoneRef, self._require("blender_ref", expected_source=SourceKind.BONE_REF))
+
+    @property
+    def effective_source_object_type(self) -> str | None:
+        """Object type used for export decisions (honors override when present)."""
+        return self.source_object_type_override or self.source_object_type
 
 
 @dataclass(slots=True)
@@ -247,7 +254,7 @@ class ExportIR:
                 continue
             if source_kind is not None and n.source_kind is not source_kind:
                 continue
-            if source_object_type is not None and n.source_object_type != source_object_type:
+            if source_object_type is not None and n.effective_source_object_type != source_object_type:
                 continue
             if emitted_only and not n.emit:
                 continue

@@ -262,7 +262,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
             return  # already linked
 
         self.ctx.node_reporter(node, "shape").debug("Linking ShapeEntry to SceneNode")
-        match node.source_object_type:
+        match node.effective_source_object_type:
             case 'MESH':
                 shape_id = self.get_or_add_mesh(node.obj)
                 # Ensure _shape extension exists before assigning shape_id
@@ -271,7 +271,7 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
                 node._shape.shape_id = shape_id
             case _:
                 # Curves are handled by resolve_curve_shapes before link_node runs:
-                # - Curves with bevel/extrusion have source_object_type set to 'MESH'
+                # - Curves with bevel/extrusion set export override to 'MESH'
                 # - NurbsCurve splines are created via add_derived_shape() with shape_id already set
                 to_transform_group(node)
 

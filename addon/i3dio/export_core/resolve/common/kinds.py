@@ -27,7 +27,7 @@ def resolve_kind_for_node(ctx: ExportContext, node: SceneNode) -> None:
     if node.kind is not NodeKind.UNRESOLVED or node.source_kind is not SourceKind.OBJECT:
         return  # already resolved or not an OBJECT
 
-    obj_type = node.source_object_type or 'EMPTY'
+    obj_type = node.effective_source_object_type or 'EMPTY'
     if (allowed := ctx.setting("object_types_to_export", ())) and obj_type not in allowed:
         to_transform_group(node)
         return  # Object type excluded by settings, keep as TG to preserve hierarchy.

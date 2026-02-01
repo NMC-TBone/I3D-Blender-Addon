@@ -69,10 +69,10 @@ def resolve_curve_shapes(ctx: ExportContext) -> None:
         if curve_has_geometry(curve_data):
             # Export as evaluated mesh (IndexedTriangleSet).
             # 1. Promote the node to SHAPE (creates _shape extension)
-            # 2. Change source_object_type so link_node registers it as a mesh
+            # 2. Set export override so link_node registers it as a mesh
             rep.debug("Curve has bevel/extrusion; exporting as evaluated mesh.")
             set_kind(node, NodeKind.SHAPE)
-            node.source_object_type = 'MESH'
+            node.source_object_type_override = 'MESH'
             # link_node will be called in shape_links pass and will register
             # the mesh shape. The evaluated geometry will be built in finalize phase.
             continue
