@@ -17,9 +17,8 @@ if TYPE_CHECKING:
 def resolve_files(ctx: "ExportContext") -> None:
     """Resolve all registered file paths and copy them if requested."""
     rep = ctx.reporter("files")
-    entries = ctx.files.entries()
-    rep.info("Finalizing %d registered files", len(entries))
-    for entry in entries:
+    rep.info("Finalizing %d registered files", len(ctx.files))
+    for entry in ctx.files.entries():
         _resolve_entry(ctx, rep, entry)
     rep.info("File finalization complete")
 
