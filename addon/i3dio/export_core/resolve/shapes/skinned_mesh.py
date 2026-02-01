@@ -1,4 +1,3 @@
-# i3dio/export_core/resolve/shapes/skinned_mesh.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

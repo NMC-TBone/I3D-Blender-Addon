@@ -1,4 +1,3 @@
-# i3dio/export_core/resolve/shapes/assemble.py
 from __future__ import annotations
 
 from collections import defaultdict

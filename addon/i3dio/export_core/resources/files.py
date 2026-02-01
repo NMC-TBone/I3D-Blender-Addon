@@ -1,4 +1,3 @@
-# i3dio/export_core/resources/files.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field

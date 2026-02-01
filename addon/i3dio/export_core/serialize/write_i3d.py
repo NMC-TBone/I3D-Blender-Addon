@@ -1,4 +1,3 @@
-# i3dio/export_core/serialize/write_i3d.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

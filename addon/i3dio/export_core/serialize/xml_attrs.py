@@ -1,4 +1,3 @@
-# i3dio/export_core/serialize/xml_attrs.py
 from __future__ import annotations
 
 from collections.abc import Mapping

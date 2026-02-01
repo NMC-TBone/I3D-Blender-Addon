@@ -1,4 +1,3 @@
-# i3dio/export_core/serialize/emit_i3d_mappings.py
 from __future__ import annotations
 
 from pathlib import Path

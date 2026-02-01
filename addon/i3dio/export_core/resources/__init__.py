@@ -1,4 +1,3 @@
-# i3dio/export_core/resources/__init__.py
 from .files import FileEntry, FileKind, FileTable
 from .materials import DEFAULT_MATERIAL_NAME, MaterialEntry, MaterialKey, MaterialTable
 from .shapes import (

@@ -1,4 +1,3 @@
-# i3dio/export_core/resolve/common/properties.py
 from __future__ import annotations
 
 import math

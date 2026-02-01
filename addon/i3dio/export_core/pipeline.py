@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import bpy
 
 from . import post_export, traverse
-from .resolve import resolve_all
+from .resolve.runner import resolve_all
 from .serialize.emit_i3d_mappings import emit_i3d_mappings
 from .serialize.write_i3d import write_i3d
 

@@ -1,4 +1,3 @@
-# i3dio/export_core/serialize/emit_scene.py
 from __future__ import annotations
 
 import math

@@ -1,4 +1,3 @@
-# i3dio/export_core/ctx.py
 from __future__ import annotations
 
 import logging

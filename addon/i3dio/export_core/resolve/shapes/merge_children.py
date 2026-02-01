@@ -1,4 +1,3 @@
-# i3dio/export_core/resolve/shapes/merge_children.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -7,7 +6,7 @@ import bpy
 import mathutils
 
 from ....utility import sort_blender_objects_by_outliner_ordering
-from ...ir import NodeKind, SourceKind, set_kind
+from ...ir import NodeKind, set_kind
 from ...resources.shapes import ShapeContributor, ShapeMode
 
 if TYPE_CHECKING:
@@ -18,7 +17,7 @@ if TYPE_CHECKING:
 # - Calculating normalized indices for motion paths or animations (e.g., vertex animation textures).
 # - Controlling visibility of elements via the `hideByIndex` shader parameter.
 # NOTE: The value must match the expected range in the shaders (e.g., [0..32767]).
-_MAX_G = 32767
+GENERIC_VALUE01_MAX_INDEX = 32767
 # Difference between Merge Group and Merge Children:
 # Merge Group collect multiple meshes which are all referenced (and keeps its location) in the scene graph
 # Merge Children collects the children meshes of the "root" and "root" mesh is not included in the IndexedTriangleSet.
@@ -27,31 +26,22 @@ _MAX_G = 32767
 
 def resolve_merge_children(ctx: "ExportContext") -> None:
     """
-    Apply MergeChildren feature for roots collected during traversal.
+    Resolve MergeChildren roots collected during traversal.
 
-    Behavior:
-    - Root becomes a Scene <Shape> (gets shapeId).
-    - Root object's own mesh is NOT included in merged shape geometry.
-    - All mesh descendants of each top-level child are merged into one ShapeEntry.
-    - Each top-level child subtree gets a distinct 'g' bucket (g_idx / 32767), incremented by interpolation_steps.
-    - Descendants have NO IR nodes (traversal stopped), so only geometry is produced.
-    - reference_frame:
-        apply_transforms=True  -> root frame
-        apply_transforms=False -> top-level child frame
+    MergeChildren merges *descendant meshes* into one ShapeEntry:
+    - The root becomes a Scene Shape (gets shapeId), but its own mesh is excluded.
+    - Children are not emitted as IR nodes; only geometry is produced.
+    - Each top-level child subtree gets a normalized generic_value01 bucket (0..1).
+    - reference_frame is root-world if apply_transforms else top-child world.
     """
     rep = ctx.reporter("merge_children")
 
     for root_id in ctx.ir.index.merge_children_roots:
         node = ctx.ir.scene_nodes[root_id]
-        if not node.emit or node.source_kind is not SourceKind.OBJECT:
-            continue
         obj = node.obj
-
-        apply_transforms = bool(obj.i3d_merge_children.apply_transforms)
-        steps = int(obj.i3d_merge_children.interpolation_steps)
-
+        mc_pg = obj.i3d_merge_children
         # Collect contributors
-        contributors = _collect_contributors(obj, apply_transforms=apply_transforms, steps=steps)
+        contributors = _collect_contributors(obj, mc_pg.apply_transforms, mc_pg.interpolation_steps)
 
         if not contributors:
             rep.warning("[%s] MergeChildren enabled but no child meshes found; exporting as regular Shape", obj.name)
@@ -73,14 +63,14 @@ def resolve_merge_children(ctx: "ExportContext") -> None:
 
 
 def _collect_contributors(
-    root_obj: bpy.types.Object, *, apply_transforms: bool, steps: int
+    root_obj: bpy.types.Object, apply_transforms: bool, steps: int
 ) -> list[tuple[bpy.types.Object, mathutils.Matrix, float]]:
     """Returns list of (mesh_obj, reference_frame, generic_value01). Root mesh is excluded."""
     root_world = root_obj.matrix_world.copy()
     out: list[tuple[bpy.types.Object, mathutils.Matrix, float]] = []
 
     for idx, top_child in enumerate(sort_blender_objects_by_outliner_ordering(root_obj.children)):
-        g = min(idx * steps, _MAX_G) / _MAX_G
+        g = min(idx * steps, GENERIC_VALUE01_MAX_INDEX) / GENERIC_VALUE01_MAX_INDEX
         ref_frame = root_world if apply_transforms else top_child.matrix_world.copy()
 
         stack = [top_child]

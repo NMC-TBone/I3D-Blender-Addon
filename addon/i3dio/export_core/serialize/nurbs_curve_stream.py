@@ -1,6 +1,3 @@
-# i3dio/export_core/serialize/nurbs_curve_stream.py
-"""Streaming writer for NurbsCurve shapes in I3D format."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -12,21 +9,7 @@ if TYPE_CHECKING:
 
 
 def write_nurbs_curve_stream(f, built: BuiltNurbsCurve, indent: str = "    ") -> None:
-    """Write a NurbsCurve element to the I3D file.
-
-    The i3D NurbsCurve format:
-    ```xml
-    <NurbsCurve name="..." shapeId="N" type="cubic|linear" degree="3" form="open|closed">
-      <cv c="x y z"/>
-      ...
-    </NurbsCurve>
-    ```
-
-    Args:
-        f: File handle to write to.
-        built: The built NurbsCurve data.
-        indent: Base indentation string.
-    """
+    """Write a NurbsCurve element to the I3D file."""
     write_open = xml_i3d.write_open_tag
     write_close = xml_i3d.write_close_tag
     write = f.write
@@ -35,14 +18,12 @@ def write_nurbs_curve_stream(f, built: BuiltNurbsCurve, indent: str = "    ") ->
     ind_cv = indent + "  "
 
     # Build NurbsCurve attributes
-    form = "closed" if built.is_cyclic else "open"
-
     nc_attrs: dict[str, object] = {
         "name": built.name,
         "shapeId": built.shape_id,
         "type": built.curve_type,
         "degree": built.degree,
-        "form": form,
+        "form": "closed" if built.is_cyclic else "open",
     }
     # Merge any additional attrs from the shape entry
     nc_attrs.update(built.attrs.node)
