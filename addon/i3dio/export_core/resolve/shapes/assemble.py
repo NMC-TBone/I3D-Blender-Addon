@@ -8,7 +8,7 @@ from ...blender.evaluated_mesh import temporary_disable_armature_modifiers
 from ...geometry.built import ShapeKind
 from ...geometry.mesh.its import MaterialKeyKind
 from ...geometry.mesh.material_resolve import resolve_slots
-from ...ir import NodeKind, SceneNode, clear_shape_binding, to_transform_group
+from ...ir import NodeKind, SceneNode, to_transform_group
 from ...resources.shapes import ShapeMode
 
 if TYPE_CHECKING:
@@ -99,17 +99,8 @@ def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[in
 
     Expects:
         shape_nodes_by_id contains only shapes that built successfully.
-
-    Centralizes:
-      - clearing stale shape bindings on non-shape nodes
-      - writing materialIds on shape nodes (per-node for NORMAL, shared for merge modes)
     """
     rep = ctx.reporter("shapes")
-
-    # Safety invariant: non-shape nodes must not carry shape bindings
-    for node in ctx.ir.iter_nodes(emitted_only=True):
-        if node.kind is not NodeKind.SHAPE:
-            clear_shape_binding(node)
 
     if not shape_nodes_by_id:
         rep.debug("No valid shape nodes; skipping materialIds finalize")
