@@ -7,9 +7,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import TYPE_CHECKING, Callable
 
-from ..ir.model import NodeKind
 from ..messages import Severity
-from ..resources.shapes import ShapeMode
 from .animations.resolve import resolve_animations
 from .common.armatures import resolve_armatures
 from .common.child_of_constraint import resolve_bone_childof
@@ -94,20 +92,7 @@ def resolve_all(ctx: ExportContext) -> None:
 
 
 def _finalize_shapes_and_materials(ctx: ExportContext) -> None:
-    # Shape build & materialIds must run before material resolve and shape vertex reqs after material resolve
-    skinned_objs = set()
-    # Only mesh objects can be skinned meshes
-    for n in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, source_object_type='MESH'):
-        entry = ctx.shapes.get_entry(n.shape.shape_id)
-        if entry is not None and entry.mode is ShapeMode.SKINNED_MESH:
-            skinned_objs.add(n.obj)
-    if skinned_objs:
-        from ..blender.evaluated_mesh import temporary_disable_armature_modifiers
-
-        with temporary_disable_armature_modifiers(ctx, skinned_objs):
-            valid_shapes = resolve_shapes_build(ctx)
-    else:
-        valid_shapes = resolve_shapes_build(ctx)
+    valid_shapes = resolve_shapes_build(ctx)
     finalize_shape_material_ids(ctx, valid_shapes)
     resolve_material_entries(ctx)
     resolve_shape_vertex_requirements(ctx, valid_shapes)

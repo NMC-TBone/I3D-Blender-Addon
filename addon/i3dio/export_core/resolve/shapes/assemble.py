@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
+from ...blender.evaluated_mesh import temporary_disable_armature_modifiers
 from ...geometry.built import ShapeKind
 from ...geometry.mesh.its import MaterialKeyKind
 from ...geometry.mesh.material_resolve import resolve_slots
 from ...ir import NodeKind, SceneNode, clear_shape_binding, to_transform_group
+from ...resources.shapes import ShapeMode
 
 if TYPE_CHECKING:
     from ...ctx import ExportContext
@@ -29,8 +32,10 @@ def _index_emitted_shape_nodes_by_id(ctx: "ExportContext") -> dict[int, list[Sce
 
 
 def resolve_shapes_build(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
-    """
-    Build/validate geometry for referenced shapes.
+    """Build/validate geometry for referenced shapes.
+
+    Temporarily disables armature modifiers for skinned meshes to ensure
+    correct deformation during evaluation.
 
     Returns:
         shape_nodes_by_id for shapes that built successfully.
@@ -47,38 +52,47 @@ def resolve_shapes_build(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
         rep.debug("No shape nodes with shapeId; skipping build")
         return {}
 
-    rep.debug("Building %d referenced shapes", len(shape_nodes_by_id))
+    # Detect skinned mesh objects to temporarily disable armature modifiers during build
+    skinned_objs = set()
+    for n in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, source_object_type='MESH'):
+        entry = ctx.shapes.get_entry(n.shape.shape_id)
+        if entry is not None and entry.mode is ShapeMode.SKINNED_MESH:
+            skinned_objs.add(n.obj)
 
-    valid: dict[int, list[SceneNode]] = {}
-    for shape_id, nodes in shape_nodes_by_id.items():
-        built = ctx.shapes.get_built(shape_id)
-        if built is None:
-            entry = ctx.shapes.get_entry(shape_id)
-            rep.warning("Shape %r produced no valid geometry; exporting as TransformGroup", entry.name)
-            for n in nodes:
-                to_transform_group(n)
-            continue
+    # Build shapes with armature modifiers temporarily disabled for skinned meshes
+    with temporary_disable_armature_modifiers(ctx, skinned_objs) if skinned_objs else nullcontext():
+        rep.debug("Building %d referenced shapes", len(shape_nodes_by_id))
 
-        # Log debug info based on shape type
-        if built.kind is ShapeKind.INDEXED_TRIANGLE_SET:
-            rep.debug(
-                "Shape id=%d built ITS: vertices=%d triangles=%d materials=%d",
-                shape_id,
-                built.vertex_count,
-                built.triangle_count,
-                len(built.material_ids),
-            )
-        elif built.kind is ShapeKind.NURBS_CURVE:
-            rep.debug(
-                "Shape id=%d built NurbsCurve: points=%d type=%s cyclic=%s",
-                shape_id,
-                built.point_count,
-                built.curve_type,
-                built.is_cyclic,
-            )
-        valid[shape_id] = nodes
+        valid: dict[int, list[SceneNode]] = {}
+        for shape_id, nodes in shape_nodes_by_id.items():
+            built = ctx.shapes.get_built(shape_id)
+            if built is None:
+                entry = ctx.shapes.get_entry(shape_id)
+                rep.warning("Shape %r produced no valid geometry; exporting as TransformGroup", entry.name)
+                for n in nodes:
+                    to_transform_group(n)
+                continue
 
-    return valid
+            # Log debug info based on shape type
+            if built.kind is ShapeKind.INDEXED_TRIANGLE_SET:
+                rep.debug(
+                    "Shape id=%d built ITS: vertices=%d triangles=%d materials=%d",
+                    shape_id,
+                    built.vertex_count,
+                    built.triangle_count,
+                    len(built.material_ids),
+                )
+            elif built.kind is ShapeKind.NURBS_CURVE:
+                rep.debug(
+                    "Shape id=%d built NurbsCurve: points=%d type=%s cyclic=%s",
+                    shape_id,
+                    built.point_count,
+                    built.curve_type,
+                    built.is_cyclic,
+                )
+            valid[shape_id] = nodes
+
+        return valid
 
 
 def finalize_shape_material_ids(ctx: "ExportContext", shape_nodes_by_id: dict[int, list[SceneNode]]) -> None:
