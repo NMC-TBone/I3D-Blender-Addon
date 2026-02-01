@@ -175,10 +175,11 @@ class I3D_IO_OT_export(Operator, ExportHelper):
             ('LIGHT', "Light", "Export lights"),
             ('MESH', "Mesh", "Export meshes"),
             ('CURVE', "Curve", "Export curves"),
+            ('FONT', "Text", "Export text objects as meshes"),
             ('ARMATURE', "Armatures", "Export armatures, used for skinned meshes"),
         ),
         options={'ENUM_FLAG'},
-        default={'EMPTY', 'CAMERA', 'LIGHT', 'MESH', 'CURVE', 'ARMATURE'},
+        default={'EMPTY', 'CAMERA', 'LIGHT', 'MESH', 'CURVE', 'FONT', 'ARMATURE'},
     )
 
     features_to_export: EnumProperty(

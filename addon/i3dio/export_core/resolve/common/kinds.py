@@ -14,6 +14,7 @@ _OBJECT_TYPE_TO_KIND: dict[str, NodeKind] = {
     "LIGHT": NodeKind.LIGHT,
     "MESH": NodeKind.SHAPE,
     "CURVE": NodeKind.TRANSFORM_GROUP,  # Resolved properly later, but if more than 1 spline, CURVE ob will be parent
+    "FONT": NodeKind.SHAPE,
     "EMPTY": NodeKind.TRANSFORM_GROUP,
     # ARMATURE intentionally not here -> TG
 }
@@ -27,12 +28,13 @@ def resolve_kind_for_node(ctx: ExportContext, node: SceneNode) -> None:
     if node.kind is not NodeKind.UNRESOLVED or node.source_kind is not SourceKind.OBJECT:
         return  # already resolved or not an OBJECT
 
-    obj_type = node.effective_source_object_type or 'EMPTY'
-    if (allowed := ctx.setting("object_types_to_export", ())) and obj_type not in allowed:
+    obj_type_raw = node.source_object_type or 'EMPTY'
+    if (allowed := ctx.setting("object_types_to_export", ())) and obj_type_raw not in allowed:
         to_transform_group(node)
         return  # Object type excluded by settings, keep as TG to preserve hierarchy.
 
-    set_kind(node, _OBJECT_TYPE_TO_KIND.get(obj_type, NodeKind.TRANSFORM_GROUP))
+    obj_type_eff = node.effective_source_object_type or obj_type_raw
+    set_kind(node, _OBJECT_TYPE_TO_KIND.get(obj_type_eff, NodeKind.TRANSFORM_GROUP))
 
     if ctx.is_dev:
         assert node.kind is not NodeKind.UNRESOLVED, "Failed to resolve kind for node %r" % (node,)
