@@ -25,7 +25,6 @@ from .shapes import (
     finalize_shape_material_ids,
     resolve_bounding_volumes,
     resolve_curve_shapes,
-    resolve_font_shapes,
     resolve_merge_children,
     resolve_merge_groups,
     resolve_shape_links,
@@ -131,7 +130,6 @@ _PHASES: tuple[ResolvePhase, ...] = (
             ResolvePass("merge_groups", resolve_merge_groups),
             ResolvePass("skinned_meshes", resolve_skinned_meshes),
             ResolvePass("curve_shapes", resolve_curve_shapes),  # Creates derived Shape nodes for splines
-            ResolvePass("font_shapes", resolve_font_shapes),
             ResolvePass("shape_links", resolve_shape_links),
             ResolvePass("bounding_volumes", resolve_bounding_volumes),
         ),

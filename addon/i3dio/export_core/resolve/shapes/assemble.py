@@ -13,6 +13,12 @@ if TYPE_CHECKING:
     from ...ctx import ExportContext
 
 
+def resolve_shape_links(ctx: ExportContext) -> None:
+    """Link Shape nodes to their ShapeEntry by calling ShapeTable.link_node."""
+    for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, emitted_only=True):
+        ctx.shapes.link_node(node)
+
+
 def _index_emitted_shape_nodes_by_id(ctx: "ExportContext") -> dict[int, list[SceneNode]]:
     shape_nodes_by_id: dict[int, list[SceneNode]] = defaultdict(list)
     for node in ctx.ir.iter_nodes(kind=NodeKind.SHAPE, emitted_only=True):

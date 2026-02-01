@@ -261,6 +261,10 @@ class ShapeTable(IdEntryTable[ShapeEntry, ShapeKey]):
         if node._shape is not None and node._shape.shape_id is not None:
             return  # already linked
 
+        # FONT objects export as mesh (set override before matching)
+        if node.source_object_type == 'FONT':
+            node.source_object_type_override = 'MESH'
+
         self.ctx.node_reporter(node, "shape").debug("Linking ShapeEntry to SceneNode")
         match node.effective_source_object_type:
             case 'MESH':
