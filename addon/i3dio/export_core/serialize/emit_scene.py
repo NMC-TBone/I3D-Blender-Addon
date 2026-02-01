@@ -67,5 +67,4 @@ def emit_scene(ctx: ExportContext, scene_elem) -> None:
     roots = ctx.ir.emitted_child_ids(None)
     rep.info("Emitting scene with %d root nodes", len(roots))
     for root_id in roots:
-        ctx.node_reporter(ctx.ir.scene_nodes[root_id]).debug("Emitting scene root node")
         emit_node(root_id, scene_elem)
