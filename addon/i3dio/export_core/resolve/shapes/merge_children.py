@@ -69,7 +69,11 @@ def _collect_contributors(
     root_world = root_obj.matrix_world.copy()
     out: list[tuple[bpy.types.Object, mathutils.Matrix, float]] = []
 
-    for idx, top_child in enumerate(sort_blender_objects_by_outliner_ordering(root_obj.children)):
+    child_objects = sort_blender_objects_by_outliner_ordering(root_obj.children)
+    if root_obj.i3d_merge_children.reverse_order:
+        child_objects.reverse()
+
+    for idx, top_child in enumerate(child_objects):
         g = min(idx * steps, GENERIC_VALUE01_MAX_INDEX) / GENERIC_VALUE01_MAX_INDEX
         ref_frame = root_world if apply_transforms else top_child.matrix_world.copy()
 
