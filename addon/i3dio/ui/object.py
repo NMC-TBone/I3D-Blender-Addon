@@ -636,7 +636,9 @@ class I3D_IO_OT_set_collision_preset(bpy.types.Operator):
     bl_idname = 'i3dio.set_collision_preset'
     bl_label = 'Set Collision Preset'
     bl_options = {'INTERNAL', 'UNDO'}
+
     preset: StringProperty()
+    apply_to_selected: BoolProperty(options={'SKIP_SAVE'})
 
     @classmethod
     def description(cls, _context, properties):
@@ -644,9 +646,19 @@ class I3D_IO_OT_set_collision_preset(bpy.types.Operator):
         if desc and getattr(desc, 'desc', None):
             return desc.desc
         return f"Set the collision preset to {properties.preset}"
-
+    
+    def invoke(self, context, event):
+        self.apply_to_selected = event.alt
+        return self.execute(context)
+    
     def execute(self, context):
-        context.object.i3d_attributes.collision_preset_name = self.preset
+        if self.apply_to_selected:
+            for obj in context.selected_objects:
+                if not obj.type == 'MESH':
+                    continue
+                obj.i3d_attributes.collision_preset_name = self.preset
+        else:
+            context.object.i3d_attributes.collision_preset_name = self.preset
         return {'FINISHED'}
 
 
