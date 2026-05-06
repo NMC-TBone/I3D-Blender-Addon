@@ -42,6 +42,15 @@ def parse(*argv, **kwargs) -> ET.ElementTree | None:
         return None
 
 
+def iter_section(root: XML_Element, section_name: str, child_tag: str) -> ET.Element | None:
+    section = root.find(section_name)
+    if section is None:
+        return None
+    for child in section:
+        if child.tag == child_tag:
+            yield child
+
+
 def SubElement(*args, **kwargs) -> ET.Element:  # noqa: N802
     return ET.SubElement(*args, **kwargs)
 
@@ -102,7 +111,7 @@ def fmt_attr_value(value: Any) -> str:
         if value.ndim == 1:
             return _fmt_vector(tuple(float(x) for x in value))
 
-    if isinstance(value, (list, tuple, bpy.types.bpy_prop_array, mathutils.Color, mathutils.Vector, IDPropertyArray)):
+    if isinstance(value, (list, tuple, bpy.types.bpy_prop_array, IDPropertyArray, mathutils.Color, mathutils.Vector)):
         return _fmt_vector(tuple(value))
 
     # Fallback
