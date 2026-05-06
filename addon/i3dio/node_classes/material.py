@@ -1,7 +1,5 @@
-import math
 from typing import ClassVar
 import bpy
-import mathutils
 from bpy_extras.node_shader_utils import PrincipledBSDFWrapper, ShaderImageTextureWrapper
 from .. import utility, xml_i3d
 from ..i3d import I3D
@@ -126,18 +124,12 @@ class Material(Node):
 
             if self.i3d_attrs.shader_variation_name != SHADER_DEFAULT:
                 self._write_attribute('customShaderVariation', self.i3d_attrs.shader_variation_name)
-            for pname in self.i3d_attrs.shader_material_params.keys():
-                parameter_dict = {'name': pname}
-                value = self.i3d_attrs.shader_material_params[pname]
+            for pname, value in self.i3d_attrs.shader_material_params.items():
                 default = self.i3d_attrs.shader_material_params.id_properties_ui(pname).as_dict().get('default')
-                if len(value) == 1:
-                    if not math.isclose(value[0], default[0], abs_tol=1e-7):
-                        parameter_dict['value'] = f'{value[0]:.6g}'
-                        xml_i3d.SubElement(self.element, 'CustomParameter', parameter_dict)
-                else:
-                    if not utility.vector_compare(mathutils.Vector(value), mathutils.Vector(default)):
-                        parameter_dict['value'] = ' '.join(f'{v:.6g}' for v in value)
-                        xml_i3d.SubElement(self.element, 'CustomParameter', parameter_dict)
+                if default is not None and utility.isclose_value(value, default):
+                    continue
+                elem = xml_i3d.SubElement(self.element, 'CustomParameter', {'name': pname})
+                xml_i3d.write_attribute(elem, "value", value)
 
             for texture in self.i3d_attrs.shader_material_textures:
                 self.logger.debug(f"Texture: '{texture.source}', default: {texture.default_source}")

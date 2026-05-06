@@ -6,6 +6,7 @@ import math
 import logging
 import bpy
 import mathutils
+from idprop.types import IDPropertyArray
 
 from . import utility
 import xml.etree.ElementTree as ET  # Technically not following pep8, but this is the naming suggestion from the module
@@ -108,7 +109,7 @@ def write_attribute(element: XML_Element, attribute: str, value) -> None:
         write_int(element, attribute, value)
     elif isinstance(value, str):
         write_string(element, attribute, value)
-    elif isinstance(value, (list, tuple, bpy.types.bpy_prop_array, mathutils.Color, mathutils.Vector)):
+    elif isinstance(value, (list, tuple, bpy.types.bpy_prop_array, IDPropertyArray, mathutils.Color, mathutils.Vector)):
         write_vector(element, attribute, tuple(value))
     else:
         logger.warning(f"No xml attribute writing function for attribute of type '{type(value)}'")
@@ -185,15 +186,7 @@ def write_i3d_properties(obj, property_group, elements: Dict[str, Union[XML_Elem
         # Conversion Checks
 
         # Special case of checking floats, since these can be not equal due to floating point errors
-        if isinstance(value, float):
-            if math.isclose(value, default, abs_tol=0.0000001):
-                continue
-        elif isinstance(value, (bpy.types.bpy_prop_array, mathutils.Color)):
-            value = tuple(value)
-            if utility.vector_compare(mathutils.Vector(value), mathutils.Vector(default)):
-                continue
-        # In the case that the value is default, then just ignore it
-        elif value == default:
+        if utility.isclose_value(value, default):
             continue
         # In some cases of enums the i3d_name is actually the enum value itself. It is signaled by not having a name
         elif i3d_name is None:
@@ -218,9 +211,9 @@ def write_i3d_properties(obj, property_group, elements: Dict[str, Union[XML_Elem
             elif field_type == 'OVERRIDE':
                 value_to_write = property_group.i3d_map[prop_key].get('override')
             elif field_type == 'ANGLE':
-                value_to_write = math.degrees(value)
-                if math.isclose(value_to_write, default, abs_tol=0.0001):
+                if utility.isclose_value(value, default):
                     continue
+                value_to_write = math.degrees(value)
 
         logger.debug(f"Property '{prop_name}' with value '{value}'. Default is '{default}'")
 
