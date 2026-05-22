@@ -11,6 +11,7 @@ from bpy.props import (
     PointerProperty,
     StringProperty,
 )
+from bpy.types import Operator, Panel
 
 from ..xml_i3d import I3D_MAX as i3d_max
 from . import light, mesh, presets
