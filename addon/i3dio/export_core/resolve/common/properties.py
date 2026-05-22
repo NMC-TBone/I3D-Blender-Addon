@@ -187,7 +187,7 @@ def _collect_pg(
         if val is _SKIP:
             continue
 
-        if utility.isclose_any(val, spec.default):
+        if utility.isclose_value(val, spec.default):
             continue
 
         i3d_name, value_to_write = _convert_for_export(val, spec)

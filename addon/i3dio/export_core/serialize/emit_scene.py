@@ -3,19 +3,13 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-import mathutils
-
-from ...utility import isclose_any
+from ...utility import isclose_value
 from ...xml_i3d import SubElementA, write_attribute
 from .xml_attrs import write_child_elements, write_node_attributes
 
 if TYPE_CHECKING:
     from ..ctx import ExportContext
     from ..ir import SceneNode
-
-_ZERO3 = mathutils.Vector((0.0, 0.0, 0.0))
-_ONE3 = mathutils.Vector((1.0, 1.0, 1.0))
-_ZERO_EULER_XYZ = mathutils.Euler((0.0, 0.0, 0.0), "XYZ")
 
 
 def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
@@ -25,13 +19,13 @@ def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
         return
     # Translation (scaled)
     t = matrix_local_export.to_translation()
-    if not isclose_any(t, _ZERO3):
+    if not isclose_value(t, (0.0, 0.0, 0.0)):
         t_scaled = (t.x * ctx.unit_scale, t.y * ctx.unit_scale, t.z * ctx.unit_scale)
         write_attribute(elem, "translation", t_scaled)
 
     # Rotation (degrees)
     r = matrix_local_export.to_euler("XYZ")
-    if not isclose_any(r, _ZERO_EULER_XYZ):
+    if not isclose_value(r, (0.0, 0.0, 0.0)):
         r_deg = (math.degrees(r.x), math.degrees(r.y), math.degrees(r.z))
         write_attribute(elem, "rotation", r_deg)
 
@@ -43,7 +37,7 @@ def _write_transform(ctx: ExportContext, elem, node: SceneNode) -> None:
         return
 
     s = matrix_local_export.to_scale()
-    if not isclose_any(s, _ONE3):
+    if not isclose_value(s, (1.0, 1.0, 1.0)):
         write_attribute(elem, "scale", (s.x, s.y, s.z))
 
 

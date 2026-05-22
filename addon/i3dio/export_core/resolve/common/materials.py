@@ -63,7 +63,7 @@ def _resolve_material_shading(ctx: ExportContext, entry: MaterialEntry) -> None:
     if (p := _image_path(principled.normalmap_texture)) is not None:
         attrs = _set_tex("Normalmap", p)
         strength = principled.normalmap_strength
-        if not utility.isclose_any(strength, 1.0):
+        if not utility.isclose_value(strength, 1.0):
             attrs.setdefault("bumpDepth", strength)
 
     # Gloss/specular
@@ -104,7 +104,7 @@ def _resolve_material_shading(ctx: ExportContext, entry: MaterialEntry) -> None:
 def _emit_custom_parameters(entry: "MaterialEntry", params) -> None:
     for name, value in params.items():
         default_value = params.id_properties_ui(name).as_dict().get("default")
-        if not utility.isclose_any(value, default_value):
+        if not utility.isclose_value(value, default_value):
             entry.extra_children.append(("CustomParameter", {"name": name, "value": value}))
 
 
