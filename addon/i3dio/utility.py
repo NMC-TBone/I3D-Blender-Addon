@@ -1,4 +1,6 @@
-"""This module contains various small utility functions, that don't really belong anywhere else"""
+"""
+This module contains various small utility functions, that don't really belong anywhere else
+"""
 
 from __future__ import annotations
 
@@ -26,6 +28,7 @@ _EXPORT_SEQUENCE_TYPES = (
     bpy.types.bpy_prop_array,
     IDPropertyArray,
 )
+
 
 def _is_number(value: object) -> bool:
     """Return True for real numeric values, but not bools."""
@@ -141,7 +144,7 @@ def as_fs_relative_path(filepath: str | Path) -> Path:
         fs_data_path = Path(bpy.path.abspath(str(fs_data_pref))).resolve(strict=False)
         try:  # Return $data-prefixed path if inside FS data directory
             relative_to_fs = target_path.relative_to(fs_data_path)
-            return Path("$data") / relative_to_fs
+            return Path('$data') / relative_to_fs
         except ValueError:
             pass  # Not inside FS data directory
     return target_path

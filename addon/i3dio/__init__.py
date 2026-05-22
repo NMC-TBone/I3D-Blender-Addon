@@ -8,13 +8,9 @@ if "bpy" in locals():
         if name.startswith(prefix):
             del sys.modules[name]
 
-import bpy
-
 from . import ui
 
-# Ordered list of all UI modules for register/unregister
-_UI_MODULES = [
-    ui.helper_functions,
+_UI_MODULES = (
     ui.addon_preferences,
     ui.udim_picker,
     ui.shader_parser,
@@ -30,7 +26,7 @@ _UI_MODULES = [
     ui.user_attributes,
     ui.mesh,
     ui.light,
-]
+)
 
 
 def register():

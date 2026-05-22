@@ -1,15 +1,7 @@
-"""
-xml_i3d.py
+"""This module contains functionality for handling the i3d xml format such as reading and writing with correct
+precision"""
 
-Helpers for reading/writing GIANTS I3D XML with consistent formatting:
-- float precision: .6g
-- bool: true/false
-- vectors: "x y z" with .6g
-- optional pretty indentation (skippable subtrees)
-- optional "stream Shapes" writer to avoid huge ElementTree node counts
-"""
-
-from __future__ import annotations
+from __future__ import annotations  # Enables python 4.0 annotation typehints fx. class self-referencing
 
 import logging
 import xml.etree.ElementTree as ET
@@ -68,10 +60,10 @@ def SubElementA(parent: ET.Element, tag: str, attrib: Mapping[str, Any] | None =
 
 # Root
 def i3d_root_element(name: str) -> XML_Element:
-    root_attributes = {"version": "1.6"}
+    root_attributes = {'version': '1.6'}
     namespaced_attributes = {
-        "xsi:noNamespaceSchemaLocation": "http://i3d.giants.ch/schema/i3d-1.6.xsd",
-        "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+        'xsi:noNamespaceSchemaLocation': 'http://i3d.giants.ch/schema/i3d-1.6.xsd',
+        'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
     }
     return ET.Element("i3D", attrib={"name": name, **root_attributes, **namespaced_attributes})
 

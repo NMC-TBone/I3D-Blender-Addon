@@ -46,7 +46,7 @@ class I3DExportUIProperties(bpy.types.PropertyGroup):
             "contain an '<i3dMapping> somewhere in the file"
         ),
         subtype='FILE_PATH',
-        default="",
+        default='',
         options={'PATH_SUPPORTS_BLEND_RELATIVE'},
     )
 
@@ -75,6 +75,8 @@ class I3DExportUIProperties(bpy.types.PropertyGroup):
 @register
 @orientation_helper(axis_forward='-Z', axis_up='Y')
 class I3D_IO_OT_export(Operator, ExportHelper):
+    """Save i3d file"""
+
     bl_idname = "export_scene.i3d"
     bl_label = "Export I3D"
     bl_options = {'UNDO', 'PRESET'}  # 'PRESET' enables the preset dialog for saving settings as preset
@@ -127,10 +129,8 @@ class I3D_IO_OT_export(Operator, ExportHelper):
 
     keep_collections_as_transformgroups: BoolProperty(
         name="Keep Collections",
-        description=(
-            "Keep organisational collections as transformgroups in the i3d file. If turned off collections "
-            "will be ignored and the child objects will be added to the nearest parent in the hierarchy"
-        ),
+        description="Keep organisational collections as transformgroups in the i3d file. If turned off collections "
+        "will be ignored and the child objects will be added to the nearest parent in the hierarchy",
         default=True,
     )
 
@@ -148,10 +148,8 @@ class I3D_IO_OT_export(Operator, ExportHelper):
 
     alphabetic_uvs: BoolProperty(
         name="Alphabetic UV's",
-        description=(
-            "UV's will be exported in  alphabetic order instead of list order "
-            "(To get around not having reordering of UV's in blender)"
-        ),
+        description="UV's will be exported in  alphabetic order instead of list order "
+        "(To get around not having reordering of UV's in blender)",
         default=False,
     )
 
@@ -190,11 +188,9 @@ class I3D_IO_OT_export(Operator, ExportHelper):
             (
                 'SKINNED_MESHES',
                 "Skinned Meshes",
-                (
-                    "Bind meshes to the bones of an armature in i3d. If disabled, "
-                    "the armature and bone structure will still be exported, "
-                    "but the meshes wont be bound to it"
-                ),
+                "Bind meshes to the bones of an armature in i3d. If disabled, "
+                "the armature and bone structure will still be exported, "
+                "but the meshes wont be bound to it",
             ),
             (
                 'MERGE_CHILDREN',
@@ -214,11 +210,9 @@ class I3D_IO_OT_export(Operator, ExportHelper):
 
     copy_files: BoolProperty(
         name="Copy Files",
-        description=(
-            "Copies the files to have them together with the i3d file. Structure is determined by 'File "
-            "Structure' parameter. If turned off files are referenced by their absolute path instead."
-            "Files from the FS data folder are always converted to relative $data\\shared\\path\\to\\file."
-        ),
+        description="Copies the files to have them together with the i3d file. Structure is determined by 'File "
+        "Structure' parameter. If turned off files are referenced by their absolute path instead."
+        "Files from the FS data folder are always converted to relative $data\\shared\\path\\to\\file.",
         default=True,
     )
 
@@ -247,24 +241,20 @@ class I3D_IO_OT_export(Operator, ExportHelper):
 
     object_sorting_prefix: StringProperty(
         name="Sorting Prefix",
-        description=(
-            "To allow some form of control over the output ordering of the objects in the I3D file it is "
-            "possible to have the exporter use anything preceeding this keyin the object name as the means for "
-            "sorting the objects, while also removing this from the final object name. "
-            "The key can be anything and even multiple characters to allow as much flexibility as possible. "
-            "To disable the functionality just set the string to nothing"
-        ),
+        description="To allow some form of control over the output ordering of the objects in the I3D file it is "
+        "possible to have the exporter use anything preceeding this keyin the object name as the means for "
+        "sorting the objects, while also removing this from the final object name. "
+        "The key can be anything and even multiple characters to allow as much flexibility as possible. "
+        "To disable the functionality just set the string to nothing",
         default=":",
     )
 
     i3d_mapping_file_path: StringProperty(
         name="XML File",
-        description=(
-            "Pick the file where you wish the exporter to export i3d-mappings. The file should be xml and"
-            "contain an '<i3dMapping> somewhere in the file"
-        ),
+        description="Pick the file where you wish the exporter to export i3d-mappings. The file should be xml and"
+        "contain an '<i3dMapping> somewhere in the file",
         subtype='FILE_PATH',
-        default="",
+        default='',
         options={'PATH_SUPPORTS_BLEND_RELATIVE'},
     )
 
@@ -520,9 +510,11 @@ def register():
     _register()
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
     bpy.types.Scene.i3dio = PointerProperty(type=I3DExportUIProperties)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     del bpy.types.Scene.i3dio
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     _unregister()

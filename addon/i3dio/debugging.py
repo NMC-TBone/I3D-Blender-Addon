@@ -1,3 +1,5 @@
+"""Debug module which primarily contains the loggers used in the code and any helpful functions for debugging"""
+
 import logging
 from contextlib import contextmanager
 
