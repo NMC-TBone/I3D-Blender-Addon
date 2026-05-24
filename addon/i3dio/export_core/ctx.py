@@ -13,6 +13,7 @@ from .ids import IdAllocator
 from .ir import ExportIR, SceneBuilder, SceneNode
 from .messages import ExportMessages
 from .reporting import Reporter
+from .resources import FileTable, MaterialTable
 
 T = TypeVar("T")
 
@@ -25,7 +26,6 @@ class ExportContext:
     perform the work and use this as shared state.
     """
 
-    name: str
     is_dev: bool
     operator: Any
     filepath: Path
@@ -34,6 +34,7 @@ class ExportContext:
     conversion_matrix: mathutils.Matrix
     settings: Mapping[str, Any]
 
+    name: str = field(init=False)
     messages: ExportMessages = field(default_factory=ExportMessages)
     ids: IdAllocator = field(default_factory=IdAllocator)
     ir: ExportIR = field(default_factory=ExportIR)
@@ -41,43 +42,24 @@ class ExportContext:
     features: frozenset[str] = field(init=False, repr=False)
     conversion_matrix_inv: mathutils.Matrix = field(init=False)
     builder: SceneBuilder = field(init=False)
+    files: FileTable = field(init=False)
+    materials: MaterialTable = field(init=False)
     i3d_folder: Path = field(init=False)
 
     unit_scale: float = 1.0
     addon_pref: bpy.types.AddonPreferences | None = None
 
-    @classmethod
-    def create(
-        cls,
-        *,
-        is_dev: bool,
-        operator: Any,
-        filepath: str | Path,
-        depsgraph: bpy.types.Depsgraph,
-        scene: bpy.types.Scene,
-        conversion_matrix: mathutils.Matrix,
-        settings: Mapping[str, Any],
-    ) -> ExportContext:
-        i3d_path = Path(filepath)
+    def __post_init__(self) -> None:
+        self.filepath = Path(self.filepath)
 
-        ctx = cls(
-            name=bpy.path.display_name_from_filepath(str(i3d_path)),
-            is_dev=is_dev,
-            operator=operator,
-            filepath=i3d_path,
-            depsgraph=depsgraph,
-            scene=scene,
-            conversion_matrix=conversion_matrix,
-            settings=settings,
-            unit_scale=scene.unit_settings.scale_length,
-        )
-
-        ctx.conversion_matrix_inv = conversion_matrix.inverted_safe()
-        ctx.builder = SceneBuilder(ctx)
-        ctx.i3d_folder = i3d_path.parent
-        ctx.features = frozenset(settings.get("features_to_export", ()))
-
-        return ctx
+        self.name = bpy.path.display_name_from_filepath(str(self.filepath))
+        self.unit_scale = self.scene.unit_settings.scale_length
+        self.conversion_matrix_inv = self.conversion_matrix.inverted_safe()
+        self.builder = SceneBuilder(self)
+        self.files = FileTable(self)
+        self.materials = MaterialTable(self)
+        self.i3d_folder = self.filepath.parent
+        self.features = frozenset(self.settings.get("features_to_export", ()))
 
     def setting(self, key: str, default: T) -> T:
         """Return a setting value, or default if the setting is missing."""
