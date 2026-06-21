@@ -14,6 +14,8 @@ from bpy_extras.io_utils import axis_conversion
 
 from . import addon_logging
 from .constants import MERGE_GROUP_PREFIX
+from .export_core import ExportContext
+from .export_core.pipeline import run_export as run_export_core
 from .export_report import ExportReport, capture_export_report, report_to_operator
 from .i3d import I3D
 from .node_classes.merge_group import MergeGroup
@@ -30,7 +32,7 @@ BINARIZER_TIMEOUT_IN_SECONDS = 30
 def export_blend_to_i3d(operator, filepath: str, axis_forward, axis_up, settings) -> dict:
     export_data = {}
 
-    addon_logging.addon_console_handler.setLevel(logging.INFO)
+    addon_logging.addon_console_handler.setLevel(logging.DEBUG if operator.verbose_output else logging.INFO)
 
     log_context = nullcontext()
     if operator.log_to_file:
@@ -50,14 +52,18 @@ def export_blend_to_i3d(operator, filepath: str, axis_forward, axis_up, settings
             logger.info(f"Exporting to {filepath}")
 
             depsgraph = bpy.context.evaluated_depsgraph_get()
+            conversion_matrix = axis_conversion(
+                to_forward=axis_forward,
+                to_up=axis_up,
+            ).to_4x4()
+
+            if operator.validate_export_core:
+                _validate_export_core(operator, filepath, depsgraph, conversion_matrix, settings)
 
             i3d = I3D(
                 name=bpy.path.display_name_from_filepath(filepath),
                 i3d_file_path=filepath,
-                conversion_matrix=axis_conversion(
-                    to_forward=axis_forward,
-                    to_up=axis_up,
-                ).to_4x4(),
+                conversion_matrix=conversion_matrix,
                 depsgraph=depsgraph,
                 settings=settings,
             )
@@ -66,10 +72,6 @@ def export_blend_to_i3d(operator, filepath: str, axis_forward, axis_up, settings
             logger.info("Exporter settings:")
             for setting, value in i3d.settings.items():
                 logger.info(f"  {setting}: {value}")
-
-            addon_logging.addon_console_handler.setLevel(
-                logging.DEBUG if operator.verbose_output else addon_logging.ADDON_CONSOLE_HANDLER_DEFAULT_LEVEL
-            )
 
             # Handle case when export is triggered from a collection
             source_collection = None
@@ -134,6 +136,26 @@ def export_blend_to_i3d(operator, filepath: str, axis_forward, axis_up, settings
     addon_logging.addon_console_handler.setLevel(addon_logging.ADDON_CONSOLE_HANDLER_DEFAULT_LEVEL)
 
     return export_data
+
+
+def _validate_export_core(operator, filepath: str, depsgraph: bpy.types.Depsgraph, conversion_matrix, settings) -> None:
+    logger.info("Validating WIP export_core pipeline")
+    ctx = ExportContext.create(
+        is_dev=False,
+        operator=operator,
+        filepath=filepath,
+        depsgraph=depsgraph,
+        scene=bpy.context.scene,
+        conversion_matrix=conversion_matrix,
+        settings=settings,
+    )
+    scope_objects = run_export_core(ctx, context=bpy.context)
+    logger.info(
+        "WIP export_core validation done: scope=%d nodes=%d roots=%d",
+        len(scope_objects),
+        len(ctx.ir.scene_nodes),
+        sum(1 for _ in ctx.ir.iter_roots()),
+    )
 
 
 def _export_active_scene_master_collection(i3d: I3D):

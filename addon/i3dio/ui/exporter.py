@@ -101,7 +101,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
         items=[
             ('ALL', "Everything", "Export everything from the scene master collection"),
             ('ACTIVE_COLLECTION', "Active Collection", "Export only the active collection and all its children"),
-            ('ACTIVE_OBJECT', "Active Object", "Export the active object and its children"),
+            ('ACTIVE_OBJECT', "Active Object", "Export the active object (with optional children)"),
             ('SELECTED_OBJECTS', "Selected Objects", "Export only selected objects (with optional children)"),
         ],
         default='SELECTED_OBJECTS',
@@ -110,8 +110,8 @@ class I3D_IO_OT_export(Operator, ExportHelper):
     selection_traverse_children: BoolProperty(
         name="Include Children",
         description=(
-            "When enabled, also exports all children of the selected objects. "
-            "When disabled, only the selected objects are exported, without their children."
+            "When enabled, also exports children of the active or selected objects. "
+            "When disabled, only the active or selected objects are exported, without their children."
         ),
         default=False,
     )
@@ -231,6 +231,12 @@ class I3D_IO_OT_export(Operator, ExportHelper):
         name="Generate logfile", description="Generates a log file in the same folder as the exported i3d", default=True
     )
 
+    validate_export_core: BoolProperty(
+        name="Validate WIP export_core",
+        description="Run the new work-in-progress export_core pipeline before the legacy exporter",
+        default=False,
+    )
+
     object_sorting_prefix: StringProperty(
         name="Sorting Prefix",
         description="To allow some form of control over the output ordering of the objects in the I3D file it is "
@@ -343,7 +349,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
 def export_main(layout: bpy.types.UILayout, operator, is_file_browser: bool):
     if is_file_browser:
         layout.prop(operator, 'selection')
-        if operator.selection == 'SELECTED_OBJECTS':
+        if operator.selection in {'ACTIVE_OBJECT', 'SELECTED_OBJECTS'}:
             layout.prop(operator, 'selection_traverse_children')
     layout.prop(operator, 'object_sorting_prefix')
 
@@ -387,6 +393,7 @@ def export_debug(layout, operator):
     if body:
         body.prop(operator, 'verbose_output')
         body.prop(operator, 'log_to_file')
+        body.prop(operator, 'validate_export_core')
 
 
 def export_i3d_mapping(layout, operator):
