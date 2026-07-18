@@ -141,7 +141,6 @@ def export_blend_to_i3d(operator, filepath: str, axis_forward, axis_up, settings
 def _validate_export_core(operator, filepath: str, depsgraph: bpy.types.Depsgraph, conversion_matrix, settings) -> None:
     logger.info("Validating WIP export_core pipeline")
     ctx = ExportContext.create(
-        is_dev=False,
         operator=operator,
         filepath=filepath,
         depsgraph=depsgraph,

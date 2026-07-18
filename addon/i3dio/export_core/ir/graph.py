@@ -2,19 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from .node import NodeKind, SceneNode, SourceKind, UserAttributeEntry
+from .node import NodeKind, SceneNode, SourceKind
 
-
-@dataclass(slots=True)
-class IRIndex:
-    """Lookup tables built during traversal/resolve.
-    These are internal pipeline indexes, not values intended for direct XML emission.
-    """
-
-    node_ids_by_blender_ptr: dict[int, list[int]] = field(default_factory=dict)
-    mapping_id_by_node_id: dict[int, str] = field(default_factory=dict)
-    user_attributes_by_node_id: dict[int, list[UserAttributeEntry]] = field(default_factory=dict)
+if TYPE_CHECKING:
+    import bpy
 
 
 @dataclass(slots=True)
@@ -23,9 +16,9 @@ class ExportIR:
 
     scene_nodes: dict[int, SceneNode] = field(default_factory=dict)
     node_order: list[int] = field(default_factory=list)
-    index: IRIndex = field(default_factory=IRIndex)
 
-    _children_by_parent_cache: dict[int | None, list[int]] | None = None
+    _node_ids_by_blender_ptr: dict[int, list[int]] = field(default_factory=dict, init=False, repr=False)
+    _children_by_parent_cache: dict[int | None, list[int]] | None = field(default=None, init=False, repr=False)
 
     def _invalidate_children_cache(self) -> None:
         self._children_by_parent_cache = None
@@ -33,7 +26,7 @@ class ExportIR:
     def _index_node_blender_ptr(self, node: SceneNode) -> None:
         """Index the node by its Blender data-block pointer for quick lookup during resolve."""
         if node.source.blender_ptr is not None:
-            self.index.node_ids_by_blender_ptr.setdefault(node.source.blender_ptr, []).append(node.id)
+            self._node_ids_by_blender_ptr.setdefault(node.source.blender_ptr, []).append(node.id)
 
     def _children_by_parent(self) -> dict[int | None, list[int]]:
         """Return cached parent-child relationships, keyed by parent node ID."""
@@ -57,10 +50,24 @@ class ExportIR:
         self._children_by_parent_cache = children
         return children
 
+    def node_ids_for(self, datablock: bpy.types.ID) -> tuple[int, ...]:
+        """Return all scene nodes that reference the given Blender data-block."""
+        return tuple(self._node_ids_by_blender_ptr.get(datablock.as_pointer(), ()))
+
+    def nodes_for(self, datablock: bpy.types.ID) -> tuple[SceneNode, ...]:
+        """Return all scene nodes referencing the given Blender data-block."""
+        return tuple(self.scene_nodes[node_id] for node_id in self.node_ids_for(datablock))
+
     def add_node(self, node: SceneNode) -> None:
         """Add a node to the IR."""
         if node.id in self.scene_nodes:
             raise RuntimeError(f"Node ID {node.id} already exists in IR")
+
+        if node.parent_id == node.id:
+            raise ValueError(f"Node {node.id} cannot parent itself")
+
+        if node.parent_id is not None and node.parent_id not in self.scene_nodes:
+            raise KeyError(f"Parent node ID {node.parent_id} not found in IR")
 
         self.scene_nodes[node.id] = node
         self.node_order.append(node.id)
@@ -73,7 +80,7 @@ class ExportIR:
             raise KeyError(f"Node ID {node_id} not found in IR")
 
         if parent_id == node_id:
-            return
+            raise ValueError(f"Node {node_id} cannot parent itself")
 
         if parent_id is not None and parent_id not in self.scene_nodes:
             raise KeyError(f"Parent node ID {parent_id} not found in IR")
@@ -81,11 +88,8 @@ class ExportIR:
         current_parent_id = parent_id
         while current_parent_id is not None:
             if current_parent_id == node_id:
-                return
-            if (parent := self.scene_nodes.get(current_parent_id)) is None:
-                break
-
-            current_parent_id = parent.parent_id
+                raise ValueError(f"Attaching node {node_id} to {parent_id} would create a cycle")
+            current_parent_id = self.scene_nodes[current_parent_id].parent_id
 
         node = self.scene_nodes[node_id]
         if node.parent_id == parent_id:
@@ -155,10 +159,10 @@ class ExportIR:
 
         for node in self.scene_nodes.values():
             if node.parent_id is not None and node.parent_id not in self.scene_nodes:
-                raise RuntimeError(f"Node {node.id} has missing parent {node.parent_id}")
+                raise KeyError(f"Parent node {node.parent_id} does not exist")
 
             if node.parent_id == node.id:
-                raise RuntimeError(f"Node {node.id} cannot be its own parent")
+                raise ValueError(f"Node {node.id} cannot parent itself")
 
             if require_resolved and node.kind is NodeKind.UNRESOLVED:
                 raise RuntimeError(f"Node {node.id} is still unresolved")

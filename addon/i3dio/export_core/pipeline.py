@@ -48,6 +48,8 @@ class _PipelineRun:
 
     def build_ir(self) -> list[bpy.types.Object]:
         """Build the IR for the current export selection mode."""
+        if self.ctx.ir.scene_nodes:
+            raise RuntimeError("ExportContext is single-use; create a new context for each pipeline run")
         if (source_collection := self._collection_export_override()) is not None:
             return self._build_collection_scope(source_collection, label=f"collection {source_collection.name!r}")
 

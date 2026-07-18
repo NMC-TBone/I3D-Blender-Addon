@@ -13,9 +13,23 @@ if TYPE_CHECKING:
 
 
 def build_object_roots(ctx: ExportContext, objects: Iterable[bpy.types.Object]) -> None:
-    """Build IR from the given object roots."""
-    for obj in _sorted_objects(objects):
+    """Build IR from the given objects, filtering to root objects only.
+
+    Objects whose parents are not in the provided object set are treated as roots
+    and traversed with their full child hierarchies.
+    """
+    object_set = set(objects)
+    roots = (obj for obj in object_set if object_set.isdisjoint(_iter_parents(obj)))
+
+    for obj in _sorted_objects(roots):
         add_object_tree(ctx, obj, parent_id=None)
+
+
+def _iter_parents(obj: bpy.types.Object) -> Iterable[bpy.types.Object]:
+    parent = obj.parent
+    while parent is not None:
+        yield parent
+        parent = parent.parent
 
 
 def build_selected_roots(ctx: ExportContext, selected_objects: list[bpy.types.Object]) -> None:

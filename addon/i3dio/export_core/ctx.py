@@ -9,9 +9,9 @@ import bpy
 import mathutils
 
 from .. import addon_logging
-from ..export_report import ExportReport
 from .ids import IdAllocator
-from .ir import ExportIR, SceneBuilder, SceneNode
+from .ir import ExportIR, SceneNode
+from .ir.builder import SceneBuilder
 
 T = TypeVar("T")
 
@@ -25,7 +25,6 @@ class ExportContext:
     """
 
     name: str
-    is_dev: bool
     operator: Any
     filepath: Path
     depsgraph: bpy.types.Depsgraph
@@ -33,7 +32,6 @@ class ExportContext:
     conversion_matrix: mathutils.Matrix
     settings: Mapping[str, Any]
 
-    report: ExportReport = field(default_factory=ExportReport)
     ids: IdAllocator = field(default_factory=IdAllocator)
     ir: ExportIR = field(default_factory=ExportIR)
 
@@ -43,7 +41,6 @@ class ExportContext:
     i3d_folder: Path = field(init=False)
 
     unit_scale: float = 1.0
-    addon_pref: bpy.types.AddonPreferences | None = None
 
     def __post_init__(self) -> None:
         self.filepath = Path(self.filepath)
@@ -56,7 +53,6 @@ class ExportContext:
     def create(
         cls,
         *,
-        is_dev: bool,
         operator: Any,
         filepath: str | Path,
         depsgraph: bpy.types.Depsgraph,
@@ -68,7 +64,6 @@ class ExportContext:
 
         return cls(
             name=bpy.path.display_name_from_filepath(str(i3d_path)),
-            is_dev=is_dev,
             operator=operator,
             filepath=i3d_path,
             depsgraph=depsgraph,

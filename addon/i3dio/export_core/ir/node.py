@@ -41,7 +41,7 @@ class BoneRef:
 BlenderRef = bpy.types.Object | bpy.types.Collection | BoneRef
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ObjectSource:
     kind: ClassVar[SourceKind] = SourceKind.OBJECT
 
@@ -54,7 +54,7 @@ class ObjectSource:
         return cls(blender_ref=obj, blender_ptr=obj.as_pointer(), object_type=obj.type)
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class CollectionSource:
     kind: ClassVar[SourceKind] = SourceKind.COLLECTION
 
@@ -67,7 +67,7 @@ class CollectionSource:
         return cls(blender_ref=collection, blender_ptr=collection.as_pointer())
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class BoneSource:
     kind: ClassVar[SourceKind] = SourceKind.BONE
 
@@ -76,7 +76,7 @@ class BoneSource:
     object_type: ClassVar[None] = None
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class SyntheticSource:
     kind: ClassVar[SourceKind] = SourceKind.OTHER
 
@@ -130,7 +130,7 @@ NodePayload = UnresolvedPayload | TransformGroupPayload | ShapePayload | Referen
 
 
 @dataclass(slots=True)
-class EmitAttrs:
+class XmlAttrs:
     """Attributes intended for final I3D/XML emission."""
 
     node: dict[str, Any] = field(default_factory=dict)
@@ -163,7 +163,7 @@ class SceneNode:
 
     matrix_local_export: Matrix | None = None
     emit: bool = True
-    attrs: EmitAttrs = field(default_factory=EmitAttrs)
+    attrs: XmlAttrs = field(default_factory=XmlAttrs)
     source_object_type_override: str | None = None
 
     @property

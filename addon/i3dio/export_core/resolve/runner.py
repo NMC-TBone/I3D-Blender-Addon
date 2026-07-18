@@ -69,7 +69,7 @@ def _per_node(fn: NodePassFn, *, emitted_only: bool = False) -> PassFn:
     """Adapt a node pass into an export-context pass."""
 
     def run(ctx: ExportContext) -> None:
-        for node in ctx.ir.iter_nodes(emitted_only=emitted_only):
+        for node in tuple(ctx.ir.iter_nodes(emitted_only=emitted_only)):
             fn(ctx, node)
 
     return run
