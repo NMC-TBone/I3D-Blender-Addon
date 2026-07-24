@@ -3,15 +3,17 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, TypeVar
+from typing import TYPE_CHECKING, Any, Mapping, TypeVar
 
 import bpy
-import mathutils
 
 from .. import addon_logging
 from .ids import IdAllocator
 from .ir import ExportIR, SceneNode
 from .ir.builder import SceneBuilder
+
+if TYPE_CHECKING:
+    import mathutils
 
 T = TypeVar("T")
 
@@ -25,7 +27,6 @@ class ExportContext:
     """
 
     name: str
-    operator: Any
     filepath: Path
     depsgraph: bpy.types.Depsgraph
     scene: bpy.types.Scene
@@ -53,7 +54,6 @@ class ExportContext:
     def create(
         cls,
         *,
-        operator: Any,
         filepath: str | Path,
         depsgraph: bpy.types.Depsgraph,
         scene: bpy.types.Scene,
@@ -64,7 +64,6 @@ class ExportContext:
 
         return cls(
             name=bpy.path.display_name_from_filepath(str(i3d_path)),
-            operator=operator,
             filepath=i3d_path,
             depsgraph=depsgraph,
             scene=scene,

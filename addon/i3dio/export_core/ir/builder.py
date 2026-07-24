@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import bpy
-
 from ..ids import IdKind
 from .node import (
     BoneRef,
@@ -21,6 +19,8 @@ from .node import (
 )
 
 if TYPE_CHECKING:
+    import bpy
+
     from ..ctx import ExportContext
 
 
@@ -82,7 +82,7 @@ class SceneBuilder:
         """Add a shape node derived from the given source object, attached to the given parent, and return its ID."""
         node = self._create_node(
             name=name,
-            source=SyntheticSource(blender_ref=source_obj),
+            source=SyntheticSource.from_object(source_obj) if source_obj is not None else SyntheticSource(),
             payload=ShapePayload(shape_id=shape_id),
             parent_id=parent_id,
         )

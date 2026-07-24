@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING
-
-import bpy
 
 from ..utility import sort_blender_objects_by_outliner_ordering
 
 if TYPE_CHECKING:
+    import bpy
+
     from .ctx import ExportContext
 
 
@@ -32,7 +32,7 @@ def _iter_parents(obj: bpy.types.Object) -> Iterable[bpy.types.Object]:
         parent = parent.parent
 
 
-def build_selected_roots(ctx: ExportContext, selected_objects: list[bpy.types.Object]) -> None:
+def build_selected_roots(ctx: ExportContext, selected_objects: Sequence[bpy.types.Object]) -> None:
     """Build IR from selected objects, preserving nearest selected parent relationships."""
     roots, children_by_parent = _selected_tree(selected_objects)
 
@@ -69,7 +69,7 @@ def add_object_tree(ctx: ExportContext, obj: bpy.types.Object, parent_id: int | 
 
 
 def _selected_tree(
-    selected_objects: list[bpy.types.Object],
+    selected_objects: Sequence[bpy.types.Object],
 ) -> tuple[list[bpy.types.Object], dict[bpy.types.Object, list[bpy.types.Object]]]:
     """Build a selected-only hierarchy using the nearest selected parent for each object."""
     selected_set = set(selected_objects)

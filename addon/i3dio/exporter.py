@@ -16,6 +16,7 @@ from . import addon_logging
 from .constants import MERGE_GROUP_PREFIX
 from .export_core import ExportContext
 from .export_core.pipeline import run_export as run_export_core
+from .export_core.scope import CollectionScope, ExportScope, ObjectScope
 from .export_report import ExportReport, capture_export_report, report_to_operator
 from .i3d import I3D
 from .node_classes.merge_group import MergeGroup
@@ -136,20 +137,38 @@ def export_blend_to_i3d(operator, filepath: str, axis_forward, axis_up, settings
     return export_data
 
 
+def _export_core_scope(operator, context: bpy.types.Context) -> ExportScope:
+    if operator.collection:
+        if (collection := bpy.data.collections.get(operator.collection)) is None:
+            raise RuntimeError(f"Collection {operator.collection!r} was not found")
+        return CollectionScope(collection)
+
+    match operator.selection:
+        case 'ALL':
+            return CollectionScope(context.scene.collection)
+        case 'ACTIVE_COLLECTION':
+            return CollectionScope(context.view_layer.active_layer_collection.collection)
+        case 'SELECTED_OBJECTS':
+            if not (objects := tuple(context.selected_objects)):
+                raise RuntimeError("No objects selected for export")
+            return ObjectScope(objects, include_children=operator.selection_traverse_children)
+        case _:
+            raise RuntimeError(f"Unknown export selection mode: {operator.selection!r}")
+
+
 def _validate_export_core(operator, filepath: str, depsgraph: bpy.types.Depsgraph, conversion_matrix, settings) -> None:
     logger.info("Validating WIP export_core pipeline")
+    context = bpy.context
     ctx = ExportContext.create(
-        operator=operator,
         filepath=filepath,
         depsgraph=depsgraph,
-        scene=bpy.context.scene,
+        scene=context.scene,
         conversion_matrix=conversion_matrix,
         settings=settings,
     )
-    scope_objects = run_export_core(ctx, context=bpy.context)
+    run_export_core(ctx, _export_core_scope(operator, context))
     logger.info(
-        "WIP export_core validation done: scope=%d nodes=%d roots=%d",
-        len(scope_objects),
+        "WIP export_core validation done: nodes=%d roots=%d",
         len(ctx.ir.scene_nodes),
         sum(1 for _ in ctx.ir.iter_roots()),
     )

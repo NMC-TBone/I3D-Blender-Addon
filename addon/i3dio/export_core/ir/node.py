@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-import bpy
-from mathutils import Matrix
+if TYPE_CHECKING:
+    import bpy
+    from mathutils import Matrix
 
 
 class NodeKind(StrEnum):
@@ -38,7 +39,10 @@ class BoneRef:
         return self.bone_name
 
 
-BlenderRef = bpy.types.Object | bpy.types.Collection | BoneRef
+if TYPE_CHECKING:
+    BlenderRef = bpy.types.Object | bpy.types.Collection | BoneRef
+else:
+    BlenderRef = Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,8 +85,12 @@ class SyntheticSource:
     kind: ClassVar[SourceKind] = SourceKind.OTHER
 
     blender_ref: BlenderRef | None = None
-    blender_ptr: ClassVar[None] = None
+    blender_ptr: int | None = None
     object_type: ClassVar[None] = None
+
+    @classmethod
+    def from_object(cls, obj: bpy.types.Object) -> SyntheticSource:
+        return cls(blender_ref=obj, blender_ptr=obj.as_pointer())
 
 
 NodeSource = ObjectSource | CollectionSource | BoneSource | SyntheticSource
@@ -138,13 +146,6 @@ class XmlAttrs:
 
     def child(self, tag: str) -> dict[str, Any]:
         return self.children.setdefault(tag, {})
-
-
-@dataclass(slots=True)
-class UserAttributeEntry:
-    name: str
-    type: str
-    value: Any
 
 
 @dataclass(slots=True)

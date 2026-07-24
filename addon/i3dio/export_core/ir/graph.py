@@ -75,7 +75,7 @@ class ExportIR:
         self._invalidate_children_cache()
 
     def attach(self, node_id: int, parent_id: int | None) -> None:
-        """Reparent a node. Missing nodes fail fast; self/cyclic reparenting is ignored."""
+        """Reparent a node, rejecting missing nodes and invalid relationships."""
         if node_id not in self.scene_nodes:
             raise KeyError(f"Node ID {node_id} not found in IR")
 
