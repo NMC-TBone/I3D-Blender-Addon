@@ -101,7 +101,6 @@ class I3D_IO_OT_export(Operator, ExportHelper):
         items=[
             ('ALL', "Everything", "Export everything from the scene master collection"),
             ('ACTIVE_COLLECTION', "Active Collection", "Export only the active collection and all its children"),
-            ('ACTIVE_OBJECT', "Active Object", "Export the active object (with optional children)"),
             ('SELECTED_OBJECTS', "Selected Objects", "Export only selected objects (with optional children)"),
         ],
         default='SELECTED_OBJECTS',
@@ -110,8 +109,8 @@ class I3D_IO_OT_export(Operator, ExportHelper):
     selection_traverse_children: BoolProperty(
         name="Include Children",
         description=(
-            "When enabled, also exports children of the active or selected objects. "
-            "When disabled, only the active or selected objects are exported, without their children."
+            "When enabled, also exports children of the selected objects. "
+            "When disabled, only the selected objects are exported, without their children."
         ),
         default=False,
     )
@@ -349,7 +348,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
 def export_main(layout: bpy.types.UILayout, operator, is_file_browser: bool):
     if is_file_browser:
         layout.prop(operator, 'selection')
-        if operator.selection in {'ACTIVE_OBJECT', 'SELECTED_OBJECTS'}:
+        if operator.selection == 'SELECTED_OBJECTS':
             layout.prop(operator, 'selection_traverse_children')
     layout.prop(operator, 'object_sorting_prefix')
 
