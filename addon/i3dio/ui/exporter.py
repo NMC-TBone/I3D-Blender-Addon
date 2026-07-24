@@ -109,7 +109,7 @@ class I3D_IO_OT_export(Operator, ExportHelper):
     selection_traverse_children: BoolProperty(
         name="Include Children",
         description=(
-            "When enabled, also exports children of the selected objects. "
+            "When enabled, also exports all children of the selected objects. "
             "When disabled, only the selected objects are exported, without their children."
         ),
         default=False,
