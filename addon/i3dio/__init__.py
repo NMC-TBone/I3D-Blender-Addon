@@ -8,9 +8,10 @@ if "bpy" in locals():
         if name.startswith(prefix):
             del sys.modules[name]
 
-from . import ui
+from . import i3d_attributes, ui
 
-_UI_MODULES = (
+_MODULES = (
+    i3d_attributes.mesh,
     ui.addon_preferences,
     ui.udim_picker,
     ui.shader_parser,
@@ -30,10 +31,10 @@ _UI_MODULES = (
 
 
 def register():
-    for module in _UI_MODULES:
+    for module in _MODULES:
         module.register()
 
 
 def unregister():
-    for module in reversed(_UI_MODULES):
+    for module in reversed(_MODULES):
         module.unregister()
