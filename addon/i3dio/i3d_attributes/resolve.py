@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cache
 
 from .. import utility
-from .schema import I3DSchema, PropertyDefinition
+from .schema import I3DSchema
 
 ErrorHandler = Callable[[str, Exception], None]
 ValueReader = Callable[[str], object]
@@ -17,7 +18,7 @@ _VALUE_ERRORS = (AttributeError, KeyError, TypeError, ValueError)
 
 @dataclass(frozen=True, slots=True)
 class ResolvedAttribute:
-    """An I3D attribute ready to be written or added to the export IR."""
+    """An export-ready value with its schema name, I3D name, and destination label."""
 
     source: str
     target: str
@@ -28,47 +29,65 @@ class ResolvedAttribute:
 def make_value_reader(
     values: object, schema: I3DSchema, *, owner: object | None = None, on_error: ErrorHandler | None = None
 ) -> ValueReader:
-    """Read effective values lazily, once per source, for one export or panel draw.
+    """Create a cached value reader for one export or panel draw.
 
-    With an error handler, failed reads return UNAVAILABLE and are reported once.
-    Without a handler, errors propagate. Export type checks happen after conversion
-    in resolve_attributes.
+    Read stored values unless tracking is enabled, then use the owner's Blender
+    property and any tracking mapping. Copy supported sequences to tuples; leave
+    export conversion to resolve_attributes. Create a new reader for each draw or
+    export so cached values cannot carry over to the next operation.
+
+    With on_error, AttributeError, KeyError, TypeError, and ValueError during a read
+    are reported once per property and cached as UNAVAILABLE. Without a handler,
+    these errors propagate with the property name in an exception note. Unexpected
+    exceptions and errors raised by on_error propagate without being cached.
     """
     if owner is None:
         owner = getattr(values, "id_data", values)
-    cache: dict[str, object] = {}
 
+    @cache
     def read(source: str) -> object:
-        if source not in cache:
-            definition = schema[source]
-            try:
-                tracking = definition.tracking
-                if tracking is not None and getattr(values, f"{source}_tracking"):
-                    value = getattr(owner, tracking.member_path)
-                    if tracking.mapping is not None:
-                        value = tracking.mapping[value]
-                else:
-                    value = getattr(values, source)
-                sequence = utility.as_export_tuple(value)
-                cache[source] = sequence if sequence is not None else value
-            except _VALUE_ERRORS as error:
-                if on_error is None:
-                    error.add_note(f"While reading I3D property {source!r}.")
-                    raise
-                cache[source] = UNAVAILABLE
-                on_error(source, error)
-        return cache[source]
+        definition = schema[source]
+        try:
+            tracking = definition.tracking
+            if tracking is not None and getattr(values, f"{source}_tracking"):
+                value = getattr(owner, tracking.member_path)
+                if tracking.mapping is not None:
+                    value = tracking.mapping[value]
+            else:
+                value = getattr(values, source)
+            sequence = utility.as_export_tuple(value)
+            return sequence if sequence is not None else value
+        except _VALUE_ERRORS as error:
+            if on_error is None:
+                error.add_note(f"While reading I3D property {source!r}.")
+                raise
+            on_error(source, error)
+            return UNAVAILABLE
 
     return read
 
 
-def dependencies_met(definition: PropertyDefinition, read_value: ValueReader) -> bool:
-    """Compare dependencies with effective, unconverted property values."""
-    for source, expected in definition.dependencies:
-        value = read_value(source)
-        if value is UNAVAILABLE or value != expected:
-            return False
-    return True
+def requirements_met(source: str, schema: I3DSchema, read_value: ValueReader) -> bool:
+    """Return whether a property's requirements and all their prerequisites pass.
+
+    Use read_value to compare stored or tracked values before export conversion.
+    UNAVAILABLE fails every comparison, including not_equals. A prerequisite can
+    pass even if it has no exported attribute or matches its export default.
+    Shared prerequisites are checked once per call; stored values are never changed.
+    """
+
+    @cache
+    def check(name: str) -> bool:
+        for requirement in schema[name].requires:
+            prerequisite = schema.name_of(requirement.source)
+            if not check(prerequisite):
+                return False
+            value = read_value(prerequisite)
+            if value is UNAVAILABLE or not requirement.matches(value):
+                return False
+        return True
+
+    return check(source)
 
 
 def _attribute_value(value: object) -> AttributeValue:
@@ -87,10 +106,15 @@ def resolve_attributes(
     owner: object | None = None,
     on_error: ErrorHandler | None = None,
 ) -> tuple[ResolvedAttribute, ...]:
-    """Capture ordered, detached attributes without changing the Blender source.
+    """Prepare I3D attributes in schema order without changing Blender properties.
 
-    Defaults and dynamic names use the property domain (e.g. radians for angles),
-    before conversion into the export domain. Destinations are owned by the caller.
+    Skip properties with unmet requirements, unavailable values, or values matching
+    their export defaults. Compare defaults and resolve callable attribute names
+    before conversion (for example, while angles are still in radians). Then apply
+    the converter and check that the result is a supported export value.
+
+    on_error reports handled read or conversion errors and skips affected attributes;
+    without it, errors propagate. The caller writes the results to their destinations.
     """
     if schema is None:
         schema = getattr(type(values), "i3d_schema")
@@ -98,7 +122,7 @@ def resolve_attributes(
     resolved: list[ResolvedAttribute] = []
 
     for source, definition in schema.exported():
-        if not dependencies_met(definition, read_value):
+        if not requirements_met(source, schema, read_value):
             continue
 
         if (value := read_value(source)) is UNAVAILABLE:

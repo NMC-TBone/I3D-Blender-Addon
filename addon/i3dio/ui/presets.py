@@ -13,7 +13,7 @@ PRESETS_PATH = PurePath(base_file_path).parent
 
 
 def schema_preset_values(attributes_path: str, schema: 'I3DSchema') -> list[str]:
-    """Save exported properties together with their choice of value source."""
+    """Return preset paths for exported properties and their tracking toggles, in schema order."""
     paths = []
     for name, definition in schema.exported():
         paths.append(f"{attributes_path}.{name}")

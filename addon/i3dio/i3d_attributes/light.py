@@ -6,8 +6,9 @@ from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProp
 from ..constants import I3D_MAX
 from .schema import I3DSchema, TrackingDefinition, exported
 
-LIGHT_SCHEMA = I3DSchema(
-    type_of_light=exported(
+
+class LightProperties:
+    type_of_light = exported(
         EnumProperty(
             name='Type',
             description='Which type of light is this?',
@@ -27,8 +28,8 @@ LIGHT_SCHEMA = I3DSchema(
             ),
             mapping={'POINT': 'point', 'SUN': 'directional', 'SPOT': 'spot', 'AREA': 'directional'},
         ),
-    ),
-    color=exported(
+    )
+    color = exported(
         FloatVectorProperty(
             name='Color',
             description='The Color of light',
@@ -49,24 +50,24 @@ LIGHT_SCHEMA = I3DSchema(
                 name='Color', description='Can be found at: Object Data Properties -> Light -> Color', default=True
             ),
         ),
-    ),
-    emit_diffuse=exported(
+    )
+    emit_diffuse = exported(
         BoolProperty(name='Diffuse', description='Diffuse', default=True),
         i3d_name='emitDiffuse',
         i3d_default=True,
-    ),
-    emit_specular=exported(
+    )
+    emit_specular = exported(
         BoolProperty(name='Specular', description='Specular', default=True),
         i3d_name='emitSpecular',
         i3d_default=True,
-    ),
-    scattering=exported(
-        BoolProperty(name='Light Scattering', description="Depends on 'Type' being 'Directional'", default=False),
+    )
+    scattering = exported(
+        BoolProperty(name='Light Scattering', description='Enable light scattering for this light', default=False),
         i3d_name='scattering',
         i3d_default=False,
-        dependencies={'type_of_light': 'directional'},
-    ),
-    range=exported(
+        requires=(type_of_light.equals('directional'),),
+    )
+    range = exported(
         FloatProperty(
             name='Range',
             description='Range',
@@ -87,11 +88,11 @@ LIGHT_SCHEMA = I3DSchema(
                 default=True,
             ),
         ),
-    ),
-    cone_angle=exported(
+    )
+    cone_angle = exported(
         FloatProperty(
             name='Cone Angle',
-            description="Depends on 'Type' being 'Spot'",
+            description='Opening angle of the spotlight cone',
             default=1.047198,
             precision=3,
             unit='ROTATION',
@@ -103,7 +104,7 @@ LIGHT_SCHEMA = I3DSchema(
         i3d_name='coneAngle',
         i3d_default=1.047198,
         converter=math.degrees,
-        dependencies={'type_of_light': 'spot'},
+        requires=(type_of_light.equals('spot'),),
         tracking=TrackingDefinition(
             member_path='spot_size',
             toggle=BoolProperty(
@@ -112,11 +113,11 @@ LIGHT_SCHEMA = I3DSchema(
                 default=True,
             ),
         ),
-    ),
-    drop_off=exported(
+    )
+    drop_off = exported(
         FloatProperty(
             name='Drop Off',
-            description="Depends on 'Type' being 'Spot'",
+            description='Intensity falloff of the spotlight',
             default=4,
             precision=3,
             min=0,
@@ -126,9 +127,9 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='dropOff',
         i3d_default=4,
-        dependencies={'type_of_light': 'spot'},
-    ),
-    cast_shadow_map=exported(
+        requires=(type_of_light.equals('spot'),),
+    )
+    cast_shadow_map = exported(
         BoolProperty(name='Cast Shadow Map', description='Cast Shadow Map', default=False),
         i3d_name='castShadowMap',
         i3d_default=False,
@@ -138,11 +139,11 @@ LIGHT_SCHEMA = I3DSchema(
                 name='Shadows', description='Can be found at: Object Data Properties -> Shadow', default=True
             ),
         ),
-    ),
-    shadow_map_bias=exported(
+    )
+    shadow_map_bias = exported(
         FloatProperty(
             name='Shadow Map Bias',
-            description="Depends on 'Cast Shadow Map' being 'True'",
+            description='Depth bias applied to the shadow map',
             default=0.005,
             precision=3,
             min=0.0,
@@ -150,12 +151,12 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='depthMapBias',
         i3d_default=0.005,
-        dependencies={'cast_shadow_map': True},
-    ),
-    shadow_map_slope_scale_bias=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    shadow_map_slope_scale_bias = exported(
         FloatProperty(
             name='Shadow Map Slope Scale Bias',
-            description="Depends on 'Cast Shadow Map' being 'True'",
+            description='Slope scale factor for the shadow map depth bias',
             default=0.005,
             precision=3,
             min=-I3D_MAX,
@@ -165,12 +166,12 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='depthMapSlopeScaleBias',
         i3d_default=0.005,
-        dependencies={'cast_shadow_map': True},
-    ),
-    shadow_map_slope_clamp=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    shadow_map_slope_clamp = exported(
         FloatProperty(
             name='Shadow Map Slope Clamp',
-            description="Depends on 'Cast Shadow Map' being 'True'",
+            description='Clamp for the slope-dependent shadow map bias',
             default=0.02,
             precision=3,
             min=-I3D_MAX,
@@ -180,12 +181,12 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='depthMapSlopeClamp',
         i3d_default=0.02,
-        dependencies={'cast_shadow_map': True},
-    ),
-    shadow_map_resolution=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    shadow_map_resolution = exported(
         EnumProperty(
             name='Shadow Map Resolution',
-            description="Depends on 'Cast Shadow Map' being 'True'",
+            description='Resolution of the shadow map',
             items=[
                 ('256', '256', '256'),
                 ('512', '512', '512'),
@@ -197,20 +198,20 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='depthMapResolution',
         i3d_default='512',
-        dependencies={'cast_shadow_map': True},
-    ),
-    shadow_map_perspective=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    shadow_map_perspective = exported(
         BoolProperty(
-            name='Shadowmap Perspective', description="Depends on 'Cast Shadow Map' being 'True'", default=False
+            name='Shadowmap Perspective', description='Use perspective projection for the shadow map', default=False
         ),
         i3d_name='shadowPerspective',
         i3d_default=False,
-        dependencies={'cast_shadow_map': True},
-    ),
-    shadow_far_distance=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    shadow_far_distance = exported(
         FloatProperty(
             name='Shadow Far Distance',
-            description="Depends on 'Cast Shadow Map' being 'True'",
+            description='Far distance used for shadow rendering',
             default=80,
             precision=3,
             min=0,
@@ -220,12 +221,12 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='shadowFarDistance',
         i3d_default=80,
-        dependencies={'cast_shadow_map': True},
-    ),
-    shadow_extrusion_distance=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    shadow_extrusion_distance = exported(
         FloatProperty(
             name='Shadow Extrusion Distance',
-            description="Depends on 'Cast Shadow Map' being 'True'",
+            description='Extrusion distance used for shadow rendering',
             default=200,
             precision=3,
             min=0,
@@ -235,23 +236,23 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='shadowExtrusionDistance',
         i3d_default=200,
-        dependencies={'cast_shadow_map': True},
-    ),
-    shadow_map_num_splits=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    shadow_map_num_splits = exported(
         EnumProperty(
             name='Shadow Map Num Splits',
-            description="Depends on 'Cast Shadow Map' being 'True'",
+            description='Number of splits used for the shadow map',
             items=[('1', '1', '1'), ('4', '4', '4')],
             default='1',
         ),
         i3d_name='numShadowMapSplits',
         i3d_default='1',
-        dependencies={'cast_shadow_map': True},
-    ),
-    split_distance_1=exported(
+        requires=(cast_shadow_map.equals(True),),
+    )
+    split_distance_1 = exported(
         FloatProperty(
             name='Split Distance #1',
-            description="Depends on 'Cast Shadow Map' being 'True' and 'Shadow Map Num Splits' being '4'",
+            description='Distance setting for shadow-map split 1',
             default=80,
             precision=3,
             min=0,
@@ -261,12 +262,12 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='shadowMapSplitDistance0',
         i3d_default=80,
-        dependencies={'shadow_map_num_splits': '4', 'cast_shadow_map': True},
-    ),
-    split_distance_2=exported(
+        requires=(shadow_map_num_splits.equals('4'),),
+    )
+    split_distance_2 = exported(
         FloatProperty(
             name='Split Distance #2',
-            description="Depends on 'Cast Shadow Map' being 'True' and 'Shadow Map Num Splits' being '4'",
+            description='Distance setting for shadow-map split 2',
             default=80,
             precision=3,
             min=0,
@@ -276,12 +277,12 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='shadowMapSplitDistance1',
         i3d_default=80,
-        dependencies={'shadow_map_num_splits': '4', 'cast_shadow_map': True},
-    ),
-    split_distance_3=exported(
+        requires=(shadow_map_num_splits.equals('4'),),
+    )
+    split_distance_3 = exported(
         FloatProperty(
             name='Split Distance #3',
-            description="Depends on 'Cast Shadow Map' being 'True' and 'Shadow Map Num Splits' being '4'",
+            description='Distance setting for shadow-map split 3',
             default=80,
             precision=3,
             min=0,
@@ -291,12 +292,12 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='shadowMapSplitDistance2',
         i3d_default=80,
-        dependencies={'shadow_map_num_splits': '4', 'cast_shadow_map': True},
-    ),
-    split_distance_4=exported(
+        requires=(shadow_map_num_splits.equals('4'),),
+    )
+    split_distance_4 = exported(
         FloatProperty(
             name='Split Distance #4',
-            description="Depends on 'Cast Shadow Map' being 'True' and 'Shadow Map Num Splits' being '4'",
+            description='Distance setting for shadow-map split 4',
             default=80,
             precision=3,
             min=0,
@@ -306,12 +307,11 @@ LIGHT_SCHEMA = I3DSchema(
         ),
         i3d_name='shadowMapSplitDistance3',
         i3d_default=80,
-        dependencies={'shadow_map_num_splits': '4', 'cast_shadow_map': True},
-    ),
-)
+        requires=(shadow_map_num_splits.equals('4'),),
+    )
 
 
-@LIGHT_SCHEMA.install
+@I3DSchema.from_definitions(LightProperties).install
 class I3DNodeLightAttributes(bpy.types.PropertyGroup):
     pass
 

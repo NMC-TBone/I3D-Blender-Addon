@@ -33,18 +33,18 @@ def poll_bounding_volume_object(attributes: bpy.types.PropertyGroup, obj: bpy.ty
     return obj.type == "MESH" and obj.data != attributes.id_data
 
 
-MESH_SCHEMA = I3DSchema(
-    casts_shadows=exported(
+class MeshProperties:
+    casts_shadows = exported(
         BoolProperty(name="Cast Shadowmap", description="Cast Shadowmap", default=True),
         i3d_name="castsShadows",
         i3d_default=False,
-    ),
-    receive_shadows=exported(
+    )
+    receive_shadows = exported(
         BoolProperty(name="Receive Shadowmap", description="Receive Shadowmap", default=True),
         i3d_name="receiveShadows",
         i3d_default=False,
-    ),
-    non_renderable=exported(
+    )
+    non_renderable = exported(
         BoolProperty(
             name="Non Renderable",
             description="Don't render the mesh, used for collision boxes etc.",
@@ -52,13 +52,13 @@ MESH_SCHEMA = I3DSchema(
         ),
         i3d_name="nonRenderable",
         i3d_default=False,
-    ),
-    distance_blending=exported(
+    )
+    distance_blending = exported(
         BoolProperty(name="Distance Blending", description="Distance Blending", default=True),
         i3d_name="distanceBlending",
         i3d_default=True,
-    ),
-    rendered_in_viewports=exported(
+    )
+    rendered_in_viewports = exported(
         BoolProperty(
             name="Rendered In Viewports",
             description=("Determines if the object is rendered in Giants Editor viewport or not"),
@@ -66,11 +66,11 @@ MESH_SCHEMA = I3DSchema(
         ),
         i3d_name="renderedInViewports",
         i3d_default=True,
-    ),
-    is_occluder=exported(
+    )
+    is_occluder = exported(
         BoolProperty(name="Occluder", description="Is Occluder?", default=False), i3d_name="occluder", i3d_default=False
-    ),
-    terrain_decal=exported(
+    )
+    terrain_decal = exported(
         BoolProperty(
             name="Terrain Decal",
             description=("If enabled, the shape will be rendered as a terrain decal"),
@@ -78,14 +78,14 @@ MESH_SCHEMA = I3DSchema(
         ),
         i3d_name="terrainDecal",
         i3d_default=False,
-    ),
-    cpu_mesh=exported(
+    )
+    cpu_mesh = exported(
         EnumProperty(name="CPU Mesh", description="CPU Mesh", items=CPU_MESH_ITEMS, default="0"),
         i3d_name="meshUsage",
         i3d_default="0",
         target="IndexedTriangleSet",
-    ),
-    double_sided=exported(
+    )
+    double_sided = exported(
         BoolProperty(
             name="Double Sided",
             description=("If enabled, the shape will be rendered from both sides"),
@@ -93,8 +93,8 @@ MESH_SCHEMA = I3DSchema(
         ),
         i3d_name="doubleSided",
         i3d_default=False,
-    ),
-    material_holder=exported(
+    )
+    material_holder = exported(
         BoolProperty(
             name="Material Holder",
             description=(
@@ -107,14 +107,14 @@ MESH_SCHEMA = I3DSchema(
         ),
         i3d_name="materialHolder",
         i3d_default=False,
-    ),
-    nav_mesh_mask=exported(
+    )
+    nav_mesh_mask = exported(
         StringProperty(name="Nav Mesh Mask (Hex)", description="Build Nav Mesh Mask", default="0"),
         i3d_name="buildNavMeshMask",
         i3d_default="0",
         converter=parse_hex_u32,
-    ),
-    decal_layer=exported(
+    )
+    decal_layer = exported(
         IntProperty(
             name="Decal Layer",
             description="Decal",
@@ -124,8 +124,8 @@ MESH_SCHEMA = I3DSchema(
         ),
         i3d_name="decalLayer",
         i3d_default=0,
-    ),
-    vertex_compression_range=exported(
+    )
+    vertex_compression_range = exported(
         EnumProperty(
             name="Vertex Compression Range",
             description="Vertex Compression Range",
@@ -135,8 +135,8 @@ MESH_SCHEMA = I3DSchema(
         i3d_name="vertexCompressionRange",
         i3d_default="auto",
         target="IndexedTriangleSet",
-    ),
-    bounding_volume_object=stored(
+    )
+    bounding_volume_object = stored(
         PointerProperty(
             name="Bounding Volume Object",
             description=(
@@ -148,19 +148,18 @@ MESH_SCHEMA = I3DSchema(
             type=bpy.types.Object,
             poll=poll_bounding_volume_object,
         )
-    ),
-    color_export=stored(
+    )
+    color_export = stored(
         EnumProperty(
             name="Vertex Color Export",
-            description=("Controls if vertex colors are exported for this mesh"),
+            description="Controls if vertex colors are exported for this mesh",
             items=COLOR_EXPORT_ITEMS,
             default="AUTO",
         )
-    ),
-)
+    )
 
 
-@MESH_SCHEMA.install
+@I3DSchema.from_definitions(MeshProperties).install
 class I3DNodeShapeAttributes(bpy.types.PropertyGroup):
     pass
 

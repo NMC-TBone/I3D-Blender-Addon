@@ -1,10 +1,9 @@
-"""Schemas own property rules; UI and export consumers share their evaluation.
+"""Share property definitions and requirement checks between the UI and export.
 
-resolve_attributes captures a tuple of detached values for immediate XML writing
-or later IR assignment. Consumers supply destinations: Node is their primary
-element, IndexedTriangleSet is a separate shape resource, and material children
-must be created by the material exporter. This package does not allocate resources
-or infer XML hierarchy from destination labels.
+resolve_attributes returns export-ready values with I3D names and destination
+labels such as Node and IndexedTriangleSet. The exporter supplies the corresponding
+XML elements and writes the values; this package reads properties and checks their
+requirements without creating XML elements or changing stored values.
 """
 
 from . import light, mesh
